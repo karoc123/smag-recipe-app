@@ -37,11 +37,16 @@ class NextcloudSso {
 
   /// Perform an authenticated JSON request. Returns the response body string.
   Future<String> request(String method, String url, {String? body}) async {
-    final result = await _channel.invokeMethod<String>('performRequest', {
+    final payload = <String, dynamic>{
       'method': method,
       'url': url,
-      if (body != null) 'body': body,
-    });
+      'body': body,
+    };
+    payload.removeWhere((key, value) => value == null);
+    final result = await _channel.invokeMethod<String>(
+      'performRequest',
+      payload,
+    );
     return result ?? '';
   }
 

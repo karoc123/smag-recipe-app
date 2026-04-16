@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/recipe.dart';
@@ -21,6 +24,9 @@ class RecipeEditScreen extends StatefulWidget {
 class _RecipeEditScreenState extends State<RecipeEditScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+  final _imagePicker = ImagePicker();
+  String? _prepDurationIso;
+  String? _cookDurationIso;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _categoryCtrl;
@@ -41,8 +47,14 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _categoryCtrl = TextEditingController(text: r?.recipeCategory ?? '');
     _yieldCtrl = TextEditingController(text: r?.recipeYield ?? '');
-    _prepTimeCtrl = TextEditingController(text: r?.prepTime ?? '');
-    _cookTimeCtrl = TextEditingController(text: r?.cookTime ?? '');
+    _prepDurationIso = r?.prepTime;
+    _cookDurationIso = r?.cookTime;
+    _prepTimeCtrl = TextEditingController(
+      text: _durationToDisplay(r?.prepTime ?? ''),
+    );
+    _cookTimeCtrl = TextEditingController(
+      text: _durationToDisplay(r?.cookTime ?? ''),
+    );
     _descriptionCtrl = TextEditingController(text: r?.description ?? '');
     _imageCtrl = TextEditingController(text: r?.image ?? '');
     _urlCtrl = TextEditingController(text: r?.url ?? '');
@@ -76,7 +88,6 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isNew = widget.recipe == null || widget.recipe!.localId == null;
     final categories = context.read<RecipeProvider>().categories;
-    final insets = MediaQuery.of(context).viewInsets.bottom;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -101,7 +112,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + insets + safeBottom),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + safeBottom),
             children: [
               // Name
               TextFormField(
@@ -152,28 +163,56 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _prepTimeCtrl,
-                      decoration: InputDecoration(labelText: l10n.prepTime),
+                      readOnly: true,
+                      onTap: () => _pickDuration(_prepTimeCtrl),
+                      decoration: InputDecoration(
+                        labelText: l10n.prepTime,
+                        suffixIcon: const Icon(Icons.schedule),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
                       controller: _cookTimeCtrl,
-                      decoration: InputDecoration(labelText: l10n.cookTime),
+                      readOnly: true,
+                      onTap: () => _pickDuration(_cookTimeCtrl),
+                      decoration: InputDecoration(
+                        labelText: l10n.cookTime,
+                        suffixIcon: const Icon(Icons.schedule),
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
 
-              // Image URL
-              TextFormField(
-                controller: _imageCtrl,
-                decoration: InputDecoration(
-                  labelText: l10n.imageUrl,
-                  suffixIcon: const Icon(Icons.image_outlined),
-                ),
+              // Image picker / URL
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _imageCtrl,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        labelText: l10n.imageUrl,
+                        suffixIcon: const Icon(Icons.image_outlined),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: _pickImageFromGallery,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    tooltip: l10n.selectImage,
+                  ),
+                ],
               ),
+              if (_imageCtrl.text.isNotEmpty &&
+                  !_imageCtrl.text.startsWith('http')) ...[
+                const SizedBox(height: 8),
+                _buildLocalImagePreview(),
+              ],
               const SizedBox(height: 12),
 
               // Source URL
@@ -238,6 +277,83 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     );
   }
 
+  Widget _buildLocalImagePreview() {
+    final file = File(_imageCtrl.text);
+    if (!file.existsSync()) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(file, height: 100, fit: BoxFit.cover),
+    );
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final picked = await _imagePicker.pickImage(source: ImageSource.gallery);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _imageCtrl.text = picked.path;
+    });
+  }
+
+  Future<void> _pickDuration(TextEditingController controller) async {
+    final sourceIso = identical(controller, _prepTimeCtrl)
+        ? (_prepDurationIso ?? '')
+        : (_cookDurationIso ?? '');
+    final initial =
+        _parseDurationToTimeOfDay(sourceIso) ??
+        const TimeOfDay(hour: 0, minute: 0);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+    if (picked == null) return;
+    final iso = 'P0DT${picked.hour}H${picked.minute}M';
+    setState(() {
+      if (identical(controller, _prepTimeCtrl)) {
+        _prepDurationIso = iso;
+      } else {
+        _cookDurationIso = iso;
+      }
+      controller.text = _durationToDisplay(iso);
+    });
+  }
+
+  TimeOfDay? _parseDurationToTimeOfDay(String value) {
+    if (value.isEmpty) return null;
+    final regex = RegExp(
+      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
+    );
+    final match = regex.firstMatch(value);
+    if (match == null) return null;
+    final days = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final hours = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final minutes = int.tryParse(match.group(3) ?? '0') ?? 0;
+    final normalizedHours = ((days * 24) + hours) % 24;
+    return TimeOfDay(hour: normalizedHours, minute: minutes.clamp(0, 59));
+  }
+
+  String _durationToDisplay(String iso) {
+    if (iso.isEmpty) return '';
+    final regex = RegExp(
+      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
+    );
+    final match = regex.firstMatch(iso);
+    if (match == null) return iso;
+    final days = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final hours = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final minutes = int.tryParse(match.group(3) ?? '0') ?? 0;
+    final parts = <String>[];
+    if (days > 0) parts.add('${days}d');
+    if (hours > 0) parts.add('${hours}h');
+    if (minutes > 0) parts.add('${minutes}min');
+    return parts.isEmpty ? '0min' : parts.join(' ');
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -257,8 +373,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
       name: _nameCtrl.text.trim(),
       recipeCategory: _categoryCtrl.text.trim(),
       recipeYield: _yieldCtrl.text.trim(),
-      prepTime: _prepTimeCtrl.text.trim(),
-      cookTime: _cookTimeCtrl.text.trim(),
+      prepTime: _prepDurationIso ?? '',
+      cookTime: _cookDurationIso ?? '',
       image: _imageCtrl.text.trim(),
       url: _urlCtrl.text.trim(),
       keywords: _keywordsCtrl.text.trim(),

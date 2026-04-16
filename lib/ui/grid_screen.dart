@@ -402,8 +402,9 @@ class _RecipeTileContent extends StatelessWidget {
         CachedNetworkImage(
           imageUrl: recipe.image,
           fit: BoxFit.cover,
-          placeholder: (_, __) => Container(color: Colors.grey[300]),
-          errorWidget: (_, __, ___) => Container(color: Colors.grey[300]),
+          placeholder: (context, url) => Container(color: Colors.grey[300]),
+          errorWidget: (context, url, error) =>
+              Container(color: Colors.grey[300]),
         ),
         Container(color: Colors.black.withValues(alpha: 0.4)),
         Padding(

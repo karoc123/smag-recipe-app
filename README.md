@@ -1,6 +1,4 @@
-# SMAG
-
-The Scandinavian Digital Cookbook.
+# SMAG - Simple Meal Archive Gallery
 
 SMAG is quiet software for recipes: local-first, offline-first, distraction-free, and built to last.
 
@@ -23,23 +21,7 @@ This project follows one rule: _Does this feature respect focus, or demand atten
 1. **Recipe Library** — category-first navigation, thumbnail list, swipe between recipes
 2. **Weekly Planner** — dynamic drag-and-drop grid with exactly one trailing `+` tile
 3. **Import** — from URL (web scraping + JSON-LD) or pasted text/JSON
-4. **Nextcloud Sync** — bidirectional sync with conflict resolution via the Nextcloud Cookbook Plugin API
-
-## Data Format
-
-Recipes are stored locally in SQLite using the **Nextcloud Cookbook JSON schema** (schema.org `Recipe`). This ensures lossless round-tripping with the Nextcloud Cookbook API.
-
-```json
-{
-  "name": "Pancakes",
-  "recipeCategory": "Breakfast",
-  "recipeYield": "4 servings",
-  "prepTime": "PT10M",
-  "cookTime": "PT15M",
-  "recipeIngredient": ["2 cups flour", "1 egg", "1 cup milk"],
-  "recipeInstructions": ["Mix ingredients", "Cook on griddle"]
-}
-```
+4. **Nextcloud Sync** — bidirectional sync with conflict resolution via the [Nextcloud Cookbook Plugin API](https://github.com/nextcloud/cookbook)
 
 ## Import Workflow
 

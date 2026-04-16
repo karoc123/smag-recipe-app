@@ -87,7 +87,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         floatingActionButton: _showGrid
             ? null
             : FloatingActionButton(
-                onPressed: () => _createRecipe(context),
+                onPressed: _createRecipe,
                 child: const Icon(Icons.add),
               ),
       ),
@@ -98,7 +98,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
-  void _createRecipe(BuildContext context) async {
+  void _createRecipe() async {
     final result = await Navigator.of(
       context,
     ).push<Recipe>(MaterialPageRoute(builder: (_) => const RecipeEditScreen()));

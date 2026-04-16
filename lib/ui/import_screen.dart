@@ -213,8 +213,9 @@ class _UrlImportTabState extends State<_UrlImportTab> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: candidates.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => GestureDetector(
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (context, i) => GestureDetector(
                     onTap: () => Navigator.pop(ctx, candidates[i]),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
@@ -223,7 +224,7 @@ class _UrlImportTabState extends State<_UrlImportTab> {
                         width: 120,
                         height: 120,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (context, error, stackTrace) => Container(
                           width: 120,
                           height: 120,
                           color: Colors.grey[300],

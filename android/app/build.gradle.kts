@@ -22,6 +22,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -63,6 +64,7 @@ flutter {
 }
 
 dependencies {
-    implementation("com.github.nextcloud:Android-SingleSignOn:0.8.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation("com.github.nextcloud:Android-SingleSignOn:1.3.4")
     implementation("com.google.code.gson:gson:2.10.1")
 }

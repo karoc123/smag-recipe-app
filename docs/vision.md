@@ -1,6 +1,6 @@
 ### _The Scandinavian Digital Cookbook_
 
-**SMAG** (Danish/Norwegian for "Taste" or "Flavor") is **Quiet Software**. It is an open-source recipe manager built as a counter-movement to noisy, ad-filled, and cloud-dependent applications. This is a serene, secure vault for culinary knowledge—a tool designed to respect the human being behind the screen.
+**SMAG** (Danish/Norwegian for "Taste" or "Flavor") is **Quiet Software**. It is an open-source recipe manager built as a counter-movement to noisy, ad-filled, and cloud-dependent applications. This is a secure vault for culinary knowledge—a tool designed to respect the human being behind the screen.
 
 ---
 

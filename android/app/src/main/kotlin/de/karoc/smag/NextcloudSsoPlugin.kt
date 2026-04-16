@@ -145,7 +145,7 @@ class NextcloudSsoPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
             result.error("NO_ACTIVITY", "No attached activity", null)
             return
         }
-        SingleAccountHelper.setCurrentAccount(ctx, "")
+        SingleAccountHelper.commitCurrentAccount(ctx, "")
         nextcloudApi?.close()
         nextcloudApi = null
         result.success(null)
@@ -238,7 +238,7 @@ class NextcloudSsoPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
         try {
             AccountImporter.onActivityResult(requestCode, resultCode, data, activity) { account ->
                 val ctx = activity ?: return@onActivityResult
-                SingleAccountHelper.setCurrentAccount(ctx, account.name)
+                SingleAccountHelper.commitCurrentAccount(ctx, account.name)
                 // Reset API so it uses the new account.
                 nextcloudApi?.close()
                 nextcloudApi = null

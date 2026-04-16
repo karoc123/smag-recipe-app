@@ -93,13 +93,10 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
                 ),
               ),
             ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _editRecipe(context),
-          ),
+          IconButton(icon: const Icon(Icons.edit), onPressed: _editRecipe),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            onPressed: () => _deleteRecipe(context),
+            onPressed: _deleteRecipe,
           ),
         ],
       ),
@@ -255,7 +252,7 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
         height: 220,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
       ),
     );
   }
@@ -304,7 +301,7 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
     );
   }
 
-  void _editRecipe(BuildContext context) async {
+  void _editRecipe() async {
     final result = await Navigator.of(context).push<Recipe>(
       MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: _current)),
     );
@@ -314,7 +311,7 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
     }
   }
 
-  void _deleteRecipe(BuildContext context) async {
+  void _deleteRecipe() async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -342,21 +339,25 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
     }
   }
 
-  /// Parse ISO 8601 duration (PT20M30S) to human-readable (20 min).
+  /// Parse ISO-like duration strings (PT20M30S, P0DT0H25M) to readable text.
   String _formatDuration(String iso8601) {
     if (iso8601.isEmpty) return '';
 
-    // Match ISO 8601 duration pattern: PT[nH][nM][nS]
-    final regex = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?');
+    // Match ISO 8601 duration pattern: P[nD]T[nH][nM][nS]
+    final regex = RegExp(
+      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
+    );
     final match = regex.firstMatch(iso8601);
 
     if (match == null) return iso8601;
 
-    final hours = int.tryParse(match.group(1) ?? '') ?? 0;
-    final minutes = int.tryParse(match.group(2) ?? '') ?? 0;
-    final seconds = int.tryParse(match.group(3) ?? '') ?? 0;
+    final days = int.tryParse(match.group(1) ?? '') ?? 0;
+    final hours = int.tryParse(match.group(2) ?? '') ?? 0;
+    final minutes = int.tryParse(match.group(3) ?? '') ?? 0;
+    final seconds = int.tryParse(match.group(4) ?? '') ?? 0;
 
     final parts = <String>[];
+    if (days > 0) parts.add('$days d');
     if (hours > 0) parts.add('$hours h');
     if (minutes > 0) parts.add('$minutes min');
     if (seconds > 0) parts.add('$seconds s');

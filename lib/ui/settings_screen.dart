@@ -165,17 +165,25 @@ class _ThemeSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: l10n.themeSelector),
-        RadioListTile<AppTheme>(
-          title: Text(l10n.lightTheme),
-          value: AppTheme.light,
-          groupValue: settings.theme,
-          onChanged: (t) => settings.setTheme(t!),
-        ),
-        RadioListTile<AppTheme>(
-          title: Text(l10n.oledDarkTheme),
-          value: AppTheme.oledDark,
-          groupValue: settings.theme,
-          onChanged: (t) => settings.setTheme(t!),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SegmentedButton<AppTheme>(
+            segments: [
+              ButtonSegment<AppTheme>(
+                value: AppTheme.light,
+                label: Text(l10n.lightTheme),
+                icon: const Icon(Icons.light_mode_outlined),
+              ),
+              ButtonSegment<AppTheme>(
+                value: AppTheme.oledDark,
+                label: Text(l10n.oledDarkTheme),
+                icon: const Icon(Icons.dark_mode_outlined),
+              ),
+            ],
+            selected: {settings.theme},
+            showSelectedIcon: false,
+            onSelectionChanged: (values) => settings.setTheme(values.first),
+          ),
         ),
       ],
     );
@@ -196,17 +204,23 @@ class _LanguageSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: l10n.languageSelector),
-        RadioListTile<Locale>(
-          title: const Text('Deutsch'),
-          value: const Locale('de'),
-          groupValue: settings.locale,
-          onChanged: (l) => settings.setLocale(l!),
-        ),
-        RadioListTile<Locale>(
-          title: const Text('English'),
-          value: const Locale('en'),
-          groupValue: settings.locale,
-          onChanged: (l) => settings.setLocale(l!),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SegmentedButton<Locale>(
+            segments: const [
+              ButtonSegment<Locale>(
+                value: Locale('de'),
+                label: Text('Deutsch'),
+              ),
+              ButtonSegment<Locale>(
+                value: Locale('en'),
+                label: Text('English'),
+              ),
+            ],
+            selected: {settings.locale},
+            showSelectedIcon: false,
+            onSelectionChanged: (values) => settings.setLocale(values.first),
+          ),
         ),
       ],
     );
