@@ -1,106 +1,150 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smag/services/recipe_parser.dart';
 
 void main() {
-  group('RecipeParser', () {
-    late RecipeParser parser;
+  late RecipeParser parser;
 
-    setUp(() {
-      parser = RecipeParser();
+  setUp(() {
+    parser = RecipeParser();
+  });
+
+  group('parseHtml – JSON-LD', () {
+    test('extracts recipe from JSON-LD script tag', () {
+      final jsonLd = jsonEncode({
+        '@type': 'Recipe',
+        'name': 'Cake',
+        'recipeIngredient': ['Flour', 'Sugar'],
+        'recipeInstructions': [
+          {'@type': 'HowToStep', 'text': 'Mix'},
+          {'@type': 'HowToStep', 'text': 'Bake'},
+        ],
+      });
+
+      final html =
+          '''
+<!DOCTYPE html>
+<html><head><title>My Cake</title>
+<script type="application/ld+json">$jsonLd</script>
+</head><body></body></html>
+''';
+
+      final result = parser.parseHtmlWithCandidates(
+        html,
+        sourceUrl: 'https://example.com/cake',
+      );
+      expect(result.recipe.name, 'Cake');
+      expect(result.recipe.recipeIngredient, ['Flour', 'Sugar']);
+      expect(result.recipe.recipeInstructions, ['Mix', 'Bake']);
+      expect(result.recipe.url, 'https://example.com/cake');
     });
 
-    test('imports JSON recipe text into structured recipe entity', () {
-      const json = '''
-{
-  "title": "Kartoffelsuppe",
-  "category": "Suppen",
-  "servings": "4",
-  "prep_time": "20 min",
-  "cook_time": "30 min",
-  "ingredients": ["1 kg Kartoffeln", "1 Zwiebel"],
-  "instructions": ["Alles schneiden.", "30 Minuten kochen."],
-  "source_url": "https://example.org/suppe"
-}
+    test('handles @graph wrapper', () {
+      final jsonLd = jsonEncode({
+        '@context': 'https://schema.org',
+        '@graph': [
+          {'@type': 'WebPage', 'name': 'Page'},
+          {
+            '@type': 'Recipe',
+            'name': 'Salad',
+            'recipeIngredient': ['Lettuce'],
+          },
+        ],
+      });
+
+      final html =
+          '''
+<html><head>
+<script type="application/ld+json">$jsonLd</script>
+</head><body></body></html>
 ''';
+
+      final recipe = parser.parseHtml(html);
+      expect(recipe.name, 'Salad');
+      expect(recipe.recipeIngredient, ['Lettuce']);
+    });
+  });
+
+  group('parseHtml – heuristic fallback', () {
+    test('extracts ingredients from microdata', () {
+      final html = '''
+<html><head><title>Soup</title></head><body>
+<ul>
+  <li itemprop="recipeIngredient">Water</li>
+  <li itemprop="recipeIngredient">Salt</li>
+</ul>
+</body></html>
+''';
+
+      final recipe = parser.parseHtml(html);
+      expect(recipe.name, 'Soup');
+      expect(recipe.recipeIngredient, ['Water', 'Salt']);
+    });
+  });
+
+  group('parsePlainText', () {
+    test('parses JSON input', () {
+      final json = jsonEncode({
+        'name': 'Toast',
+        'recipeIngredient': ['Bread', 'Butter'],
+        'recipeInstructions': ['Toast bread', 'Apply butter'],
+      });
 
       final recipe = parser.parsePlainText(json);
-
-      expect(recipe.title, 'Kartoffelsuppe');
-      expect(recipe.category, 'Suppen');
-      expect(recipe.servings, '4');
-      expect(recipe.prepTime, '20 min');
-      expect(recipe.cookTime, '30 min');
-      expect(recipe.body, contains('## Ingredients'));
-      expect(recipe.body, contains('- 1 kg Kartoffeln'));
-      expect(recipe.body, contains('## Instructions'));
-      expect(recipe.body, contains('1. Alles schneiden.'));
-      expect(recipe.body, contains('*Source: https://example.org/suppe*'));
+      expect(recipe.name, 'Toast');
+      expect(recipe.recipeIngredient, ['Bread', 'Butter']);
     });
 
-    test('extracts simple recipe html with title and sections', () {
-      const html = '''
-<!doctype html>
-<html>
-  <head>
-    <title>Projekt:Essen</title>
-  </head>
-  <body>
-    <article>
-      <figure><img src="/images/kuchen.jpg"/></figure>
-      <h2>Zutaten</h2>
-      <ul><li>2 Eier</li><li>200 g Mehl</li></ul>
-      <h2>Zubereitung</h2>
-      <p>Alles verruehren.</p>
-      <p>Backen.</p>
-    </article>
-  </body>
-</html>
-''';
+    test('parses JSON with alternate keys (title, category)', () {
+      final json = jsonEncode({
+        'title': 'Omelette',
+        'category': 'Breakfast',
+        'ingredients': ['Eggs', 'Cheese'],
+        'instructions': ['Beat eggs', 'Cook'],
+      });
 
-      final parsed = parser.parseHtmlWithCandidates(
-        html,
-        sourceUrl: 'https://essen.karoc.de/posts/porno-schoko-kuchen/',
-      );
-
-      expect(parsed.recipe.title, 'porno schoko kuchen');
-      expect(parsed.recipe.body, contains('## Ingredients'));
-      expect(parsed.recipe.body, contains('- 2 Eier'));
-      expect(parsed.recipe.body, contains('## Instructions'));
-      expect(parsed.imageCandidates, isNotEmpty);
-      expect(
-        parsed.imageCandidates.first,
-        startsWith('https://essen.karoc.de/'),
-      );
+      final recipe = parser.parsePlainText(json);
+      expect(recipe.name, 'Omelette');
+      expect(recipe.recipeCategory, 'Breakfast');
     });
 
-    test('returns up to five unique image candidates', () {
-      const html = '''
-<!doctype html>
-<html>
-  <head>
-    <meta property="og:image" content="https://img.example/a.jpg"/>
-    <meta name="twitter:image" content="https://img.example/b.jpg"/>
-  </head>
-  <body>
-    <img src="https://img.example/c.jpg"/>
-    <img src="https://img.example/d.jpg"/>
-    <img src="https://img.example/e.jpg"/>
-    <img src="https://img.example/f.jpg"/>
-    <img src="https://img.example/g.jpg"/>
-  </body>
-</html>
+    test('parses markdown-style text', () {
+      const text = '''
+# My Recipe
+
+## Ingredients
+- Flour
+- Water
+
+## Instructions
+1. Mix together
+2. Bake
 ''';
 
-      final parsed = parser.parseHtmlWithCandidates(
-        html,
-        sourceUrl: 'https://example.com/recipe',
-      );
+      final recipe = parser.parsePlainText(text);
+      expect(recipe.name, 'My Recipe');
+      expect(recipe.recipeIngredient, ['Flour', 'Water']);
+      expect(recipe.recipeInstructions, ['Mix together', 'Bake']);
+    });
 
-      expect(parsed.imageCandidates.length, lessThanOrEqualTo(5));
-      expect(
-        parsed.imageCandidates.toSet().length,
-        parsed.imageCandidates.length,
-      );
+    test('handles German section headers', () {
+      const text = '''
+Kartoffelsuppe
+
+## Zutaten
+- Kartoffeln
+- Salz
+
+## Zubereitung
+- Kochen
+- Würzen
+''';
+
+      final recipe = parser.parsePlainText(text);
+      expect(recipe.name, 'Kartoffelsuppe');
+      expect(recipe.recipeIngredient, ['Kartoffeln', 'Salz']);
+      expect(recipe.recipeInstructions, ['Kochen', 'Würzen']);
     });
   });
 }

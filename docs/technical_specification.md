@@ -1,36 +1,66 @@
 **Framework:** Flutter
-**Data Format:** Hugo-compatible Markdown (.md) with TOML frontmatter (`+++`).
+**Data Format:** Nextcloud Cookbook JSON schema (schema.org Recipe) stored in SQLite.
+**Sync:** Nextcloud Cookbook Plugin API v1 via Android SSO.
 
 ### 1. Storage Architecture
 
-- **Local-First:** All data resides in a user-defined local directory (perfect for Nextcloud/Syncthing).
-- **Folder Hierarchy:** Categories = Folders.
-- **Assets:** Images are stored in a relative `/images` folder, ensuring the Markdown file remains portable.
+- **Local-First:** All data resides in a local SQLite database (`recipes` + `grid_slots` tables).
+- **JSON Blob:** Each recipe row stores the full Nextcloud Cookbook JSON in a `json_data` column for lossless API round-tripping.
+- **Sync Status:** Each recipe tracks its state: `localOnly`, `synced`, `pendingUpload`, or `conflict`.
 
-### 2. The SMAG File Standard
+### 2. The SMAG Data Schema
 
-Files follow the Hugo static site generator structure:
+Recipes follow the Nextcloud Cookbook JSON format:
 
-```toml
-+++
-title = "Pornokuchen"
-date = 2026-04-14T23:45:00Z
-category = "Desserts"
-[extra]
-slot = 3  # Link to the 7-day grid
-+++
-
-{{< figure src="/images/pornokuchen.jpg" >}}
-
-## Ingredients
-- ...
+```json
+{
+  "id": 42,
+  "name": "Pornokuchen",
+  "recipeCategory": "Desserts",
+  "recipeYield": "8 servings",
+  "prepTime": "PT20M",
+  "cookTime": "PT45M",
+  "recipeIngredient": ["200g chocolate", "4 eggs"],
+  "recipeInstructions": ["Melt chocolate", "Mix with eggs", "Bake at 180°C"],
+  "image": "https://...",
+  "url": "https://...",
+  "dateModified": "2026-04-14T23:45:00+0000"
+}
 ```
 
 ### 3. Core Functional Pillars
 
-- **The Grid:** A 7-square visual dashboard. Users assign recipes to slots via a simple toggle in the recipe view. Slots are managed in a local `config.toml`.
-- **The Hybrid Search:** A local SQLite FTS5 index enables instant full-text searching across all Markdown files without needing a backend.
+- **The Grid:** A 7-slot visual dashboard. Users assign recipes to slots via drag-and-drop or a picker dialog. Slots are managed in the `grid_slots` SQLite table.
+- **The Search:** SQLite LIKE queries across recipe name, category, and ingredients.
 - **The Cook-Mode:** Integration of `wakelock` to keep the screen active.
-- **The Portability Engine:**
-  - **Import:** Local scraper converts URLs to SMAG-formatted Markdown.
-  - **Export:** Generates a `.zip` archive containing the `.md` files, images, and a plan-manifest for easy sharing between devices without overwriting existing local edits.
+- **The Import Engine:**
+  - **From URL:** JSON-LD extraction + heuristic HTML scraping. Up to 5 image candidates detected.
+  - **From Text:** JSON parsing (Nextcloud schema + alternate keys) or markdown-style heuristic parsing.
+  - **Nextcloud Push:** Import directly to Nextcloud Cookbook via `POST /api/v1/recipes/import`.
+- **The Sync Engine:**
+  - Bidirectional sync comparing `dateModified` timestamps.
+  - Manual trigger only (no background sync).
+  - Conflict detection with user-facing resolution dialog (keep local / keep server).
+
+### 4. Authentication
+
+- **Nextcloud Android SSO** library v0.8.1 via platform channel (Kotlin ↔ Dart).
+- Channel name: `de.karoc.smag/nextcloud_sso`
+- Methods: `pickAccount`, `getCurrentAccount`, `resetAccount`, `performRequest`, `performBinaryRequest`.
+- Requires the Nextcloud Android client to be installed on the device.
+
+### 5. Navigation
+
+Three-button `BottomNavigationBar`:
+
+1. **View Toggle** — switches between recipe list and 7-slot grid
+2. **Import** — URL and text import with Nextcloud push option
+3. **Settings** — sync management, theme, language, about
+
+Back button: Grid/Settings/Import always return to the main recipe overview.
+
+### 6. Theming
+
+- **Light:** Sage green (#6B8F71) primary, warm white (#F5F2ED) background.
+- **OLED Dark:** Pure black (#000000) background, #0A0A0A surface.
+- Fonts: Playfair Display (headlines), Inter (body), JetBrains Mono (code/editor).

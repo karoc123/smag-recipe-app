@@ -12,25 +12,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'SMAG';
 
   @override
-  String get gridTitle => 'Your Week';
-
-  @override
-  String get emptySlot => 'Add Recipe';
-
-  @override
   String get recipes => 'Recipes';
+
+  @override
+  String get grid => 'Grid';
 
   @override
   String get search => 'Search';
 
   @override
-  String get searchHint => 'Search recipes…';
-
-  @override
   String get noRecipes => 'No recipes yet. Import or create one!';
-
-  @override
-  String get noResults => 'No results found.';
 
   @override
   String get newRecipe => 'New Recipe';
@@ -42,9 +33,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteRecipe => 'Delete Recipe';
 
   @override
-  String deleteConfirm(String title) {
-    return 'Are you sure you want to delete \"$title\"?';
-  }
+  String get deleteRecipeConfirm =>
+      'Are you sure you want to delete this recipe?';
 
   @override
   String get save => 'Save';
@@ -56,67 +46,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get delete => 'Delete';
 
   @override
-  String get overwrite => 'Overwrite';
+  String get close => 'Close';
 
   @override
-  String get overwriteTitle => 'Recipe Exists';
+  String get importTitle => 'Import';
 
   @override
-  String overwriteMessage(String title) {
-    return '\"$title\" already exists. Overwrite?';
-  }
+  String get importFromUrl => 'From URL';
 
   @override
-  String get importRecipe => 'Import Recipe';
+  String get importFromText => 'From Text';
 
   @override
-  String get importFromUrl => 'Import from URL';
+  String get importButton => 'Import';
 
   @override
-  String get importFromText => 'Import from Text';
+  String get importLocally => 'Import Locally';
 
   @override
-  String get urlHint => 'Paste recipe URL…';
+  String get sendToNextcloud => 'Send to Nextcloud';
 
   @override
-  String get textHint => 'Paste recipe text…';
+  String get sentToNextcloud => 'Recipe sent to Nextcloud';
 
   @override
-  String get importing => 'Importing…';
+  String get importedRecipe => 'Imported recipe';
 
   @override
-  String get importSuccess => 'Recipe imported successfully!';
+  String get copyPrompt => 'Copy Prompt';
 
   @override
-  String get importError => 'Could not import recipe.';
+  String get promptCopied => 'Prompt copied to clipboard';
+
+  @override
+  String get pasteRecipeHint => 'Paste JSON or recipe text here…';
+
+  @override
+  String get selectImage => 'Select Image';
+
+  @override
+  String get skip => 'Skip';
 
   @override
   String get title => 'Title';
 
   @override
+  String get titleRequired => 'Title is required';
+
+  @override
   String get category => 'Category';
+
+  @override
+  String get description => 'Description';
 
   @override
   String get ingredients => 'Ingredients';
 
   @override
+  String get ingredientsHint => 'One ingredient per line';
+
+  @override
   String get instructions => 'Instructions';
 
   @override
-  String get pickDirectory => 'Select Recipe Folder';
-
-  @override
-  String get pickDirectoryHint =>
-      'Choose the directory where your recipes are stored.';
-
-  @override
-  String get removeFromGrid => 'Remove from grid';
-
-  @override
-  String get assignToGrid => 'Add to grid';
-
-  @override
-  String get cookMode => 'Cook Mode';
+  String get instructionsHint => 'One step per line';
 
   @override
   String get servings => 'Servings';
@@ -128,20 +121,86 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cookTime => 'Cook Time';
 
   @override
-  String get recipePickerTitle => 'Choose a Recipe';
+  String get imageUrl => 'Image URL';
+
+  @override
+  String get keywords => 'Keywords';
 
   @override
   String get settings => 'Settings';
 
   @override
-  String get storageDirectory => 'Storage Directory';
+  String get syncManagement => 'Nextcloud Sync';
 
   @override
-  String get notSet => 'Not set';
+  String get syncNow => 'Sync Now';
 
   @override
-  String get dragToRemove => 'Drag here to remove';
+  String syncComplete(String details) {
+    return 'Sync complete: $details';
+  }
 
   @override
-  String get categoryUncategorized => 'Uncategorized';
+  String get connectNextcloud => 'Connect Nextcloud';
+
+  @override
+  String get connectNextcloudHint =>
+      'Link your Nextcloud Cookbook to sync recipes';
+
+  @override
+  String get disconnectAccount => 'Disconnect Account';
+
+  @override
+  String get disconnectConfirm =>
+      'Disconnect from Nextcloud? Local recipes will remain.';
+
+  @override
+  String get disconnect => 'Disconnect';
+
+  @override
+  String get noAccountLinked => 'No account linked';
+
+  @override
+  String get themeSelector => 'Theme';
+
+  @override
+  String get lightTheme => 'Light';
+
+  @override
+  String get oledDarkTheme => 'OLED Dark';
+
+  @override
+  String get languageSelector => 'Language';
+
+  @override
+  String get about => 'About';
+
+  @override
+  String get githubRepo => 'GitHub Repository';
+
+  @override
+  String get philosophy => 'Philosophy (FOSS ❤)';
+
+  @override
+  String get philosophyTitle => 'Why SMAG?';
+
+  @override
+  String get philosophyBody =>
+      'SMAG is Free and Open Source Software, built as a counter-movement to noisy, ad-filled cooking apps.\n\nYour recipes are yours. No accounts, no tracking, no cloud dependency. When you choose to sync via Nextcloud, your data stays on infrastructure you control.';
+
+  @override
+  String get shoppingList => 'Shopping List';
+
+  @override
+  String get conflictTitle => 'Sync Conflict';
+
+  @override
+  String get conflictMessage =>
+      'This recipe was changed both locally and on the server. Which version do you want to keep?';
+
+  @override
+  String get keepLocal => 'Keep Local';
+
+  @override
+  String get keepServer => 'Keep Server';
 }

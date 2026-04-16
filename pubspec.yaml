@@ -1,7 +1,7 @@
 name: smag
-description: "SMAG – Simple Markdown Archive & Grid. A quiet, local-first recipe manager."
+description: "SMAG – A quiet, offline-first recipe manager with Nextcloud Cookbook sync."
 publish_to: "none"
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: ^3.11.4
@@ -15,7 +15,6 @@ dependencies:
   provider: ^6.1.2
   path_provider: ^2.1.5
   sqflite: ^2.4.2
-  toml: ^0.16.0
   wakelock_plus: ^1.3.2
   google_fonts: ^6.2.1
   file_picker: ^9.2.1
@@ -24,7 +23,8 @@ dependencies:
   html: ^0.15.5
   path: ^1.9.1
   shared_preferences: ^2.3.5
-  webdav_client: ^1.2.2
+  url_launcher: ^6.3.1
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

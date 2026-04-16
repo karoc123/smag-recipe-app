@@ -1,25 +1,22 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
-import 'data/file_repository.dart';
+import 'data/nextcloud_api.dart';
+import 'data/nextcloud_sso.dart';
+import 'data/recipe_database.dart';
 import 'services/config_service.dart';
 import 'services/recipe_parser.dart';
-import 'services/search_service.dart';
-import 'services/webdav_sync_service.dart';
+import 'services/sync_service.dart';
 import 'state/grid_provider.dart';
 import 'state/recipe_provider.dart';
+import 'state/settings_provider.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Prefer edge-to-edge, light status bar
+  // Transparent status bar with dark icons.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -28,45 +25,35 @@ Future<void> main() async {
   );
 
   // Core services
+  final db = RecipeDatabase();
   final parser = RecipeParser();
-  final configService = ConfigService();
-  final searchService = SearchService();
-  final fileRepository = FileRepository(parser);
-  final webDavSyncService = WebDavSyncService();
+  final sso = NextcloudSso();
+  final api = NextcloudApi(sso);
+  final configService = ConfigService(db);
+  final syncService = SyncService(db, api, sso);
 
-  // Initialize search asynchronously so a DB init issue cannot block first frame.
-  unawaited(searchService.init());
+  // State providers
+  final settingsProvider = SettingsProvider(sso);
+  await settingsProvider.init();
 
-  // Use app-private internal storage root for Play Store compliant, permissionless I/O.
-  final documentsDir = await getApplicationDocumentsDirectory();
-  final rootDir = p.join(documentsDir.path, 'smag_data');
-  final root = Directory(rootDir);
-  if (!await root.exists()) {
-    await root.create(recursive: true);
-  }
-  await configService.init(rootDir);
+  final recipeProvider = RecipeProvider(db, parser);
+  await recipeProvider.loadRecipes();
+
+  final gridProvider = GridProvider(configService, db);
+  await gridProvider.load();
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<RecipeDatabase>.value(value: db),
         Provider<RecipeParser>.value(value: parser),
+        Provider<NextcloudSso>.value(value: sso),
+        Provider<NextcloudApi>.value(value: api),
         Provider<ConfigService>.value(value: configService),
-        Provider<SearchService>.value(value: searchService),
-        Provider<WebDavSyncService>.value(value: webDavSyncService),
-        Provider<FileRepository>.value(value: fileRepository),
-        ChangeNotifierProvider(
-          create: (_) {
-            final provider = RecipeProvider(
-              fileRepository,
-              parser,
-              configService,
-              searchService,
-            );
-            provider.loadRecipes();
-            return provider;
-          },
-        ),
-        ChangeNotifierProvider(create: (_) => GridProvider(configService)),
+        Provider<SyncService>.value(value: syncService),
+        ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
+        ChangeNotifierProvider<RecipeProvider>.value(value: recipeProvider),
+        ChangeNotifierProvider<GridProvider>.value(value: gridProvider),
       ],
       child: const SmagApp(),
     ),

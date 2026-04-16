@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:smag/l10n/app_localizations.dart';
 
-import '../domain/recipe_entity.dart';
+import '../domain/recipe.dart';
+import '../l10n/app_localizations.dart';
 import '../state/recipe_provider.dart';
 import 'recipe_view_screen.dart';
-import 'recipe_edit_screen.dart';
 
+/// Recipe list with category selection first, then filtered recipe view.
+///
+/// Groups recipes by [Recipe.displayCategory], shows categories as a picker,
+/// then displays only recipes in the selected category.
 class RecipeListScreen extends StatefulWidget {
   const RecipeListScreen({super.key});
 
@@ -16,8 +19,9 @@ class RecipeListScreen extends StatefulWidget {
 }
 
 class _RecipeListScreenState extends State<RecipeListScreen> {
+  String? _selectedCategory;
+  bool _searching = false;
   final _searchController = TextEditingController();
-  bool _isSearching = false;
 
   @override
   void dispose() {
@@ -33,154 +37,187 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
         ? provider.searchResults
         : provider.recipes;
 
+    // Get all categories
+    final allCategories = <String>{};
+    for (final r in recipes) {
+      allCategories.add(r.displayCategory);
+    }
+    final categories = allCategories.toList()..sort();
+
+    // If no category selected, show category picker
+    if (_selectedCategory == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.recipes),
+          automaticallyImplyLeading: false,
+        ),
+        body: _CategoryPicker(
+          categories: categories,
+          onSelect: (cat) {
+            setState(() => _selectedCategory = cat);
+          },
+        ),
+      );
+    }
+
+    // Filter recipes to selected category
+    final categoryRecipes = recipes
+        .where((r) => r.displayCategory == _selectedCategory)
+        .toList();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2ED),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F2ED),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: const Color(0xFF2D3436),
-        title: _isSearching
+        title: _searching
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: l10n.searchHint,
+                  hintText: l10n.search,
                   border: InputBorder.none,
-                  hintStyle: GoogleFonts.inter(color: Colors.grey),
+                  filled: false,
                 ),
-                style: GoogleFonts.inter(),
                 onChanged: (q) => provider.search(q),
               )
-            : Text(
-                l10n.recipes,
-                style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.w700),
-              ),
+            : Text(_selectedCategory!),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            setState(() => _selectedCategory = null);
+          },
+        ),
         actions: [
           IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search_rounded),
+            icon: Icon(_searching ? Icons.close : Icons.search),
             onPressed: () {
-              setState(() => _isSearching = !_isSearching);
-              if (!_isSearching) {
-                _searchController.clear();
-                provider.clearSearch();
-              }
+              setState(() {
+                _searching = !_searching;
+                if (!_searching) {
+                  _searchController.clear();
+                  provider.clearSearch();
+                }
+              });
             },
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF6B8F71),
-        foregroundColor: Colors.white,
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RecipeEditScreen()),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: provider.loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF6B8F71)),
-            )
-          : recipes.isEmpty
-          ? Center(
-              child: Text(
-                provider.searchQuery.isNotEmpty
-                    ? l10n.noResults
-                    : l10n.noRecipes,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: const Color(0xFF636E72),
-                ),
-              ),
-            )
-          : _buildList(context, recipes),
-    );
-  }
-
-  Widget _buildList(BuildContext context, List<RecipeEntity> recipes) {
-    // Group by category
-    final grouped = <String, List<RecipeEntity>>{};
-    for (final r in recipes) {
-      final cat = r.category.isNotEmpty ? r.category : 'Uncategorized';
-      grouped.putIfAbsent(cat, () => []).add(r);
-    }
-    final sortedKeys = grouped.keys.toList()..sort();
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: sortedKeys.length,
-      itemBuilder: (ctx, catIndex) {
-        final category = sortedKeys[catIndex];
-        final items = grouped[category]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (catIndex > 0) const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                category,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF636E72),
-                  letterSpacing: 0.5,
-                ),
+      body: categoryRecipes.isEmpty
+          ? Center(child: Text(l10n.noRecipes))
+          : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 80),
+              itemCount: categoryRecipes.length,
+              itemBuilder: (context, i) => _RecipeTile(
+                recipe: categoryRecipes[i],
+                peerRecipes: categoryRecipes,
+                index: i,
               ),
             ),
-            ...items.map((recipe) => _RecipeTile(recipe: recipe)),
-          ],
-        );
-      },
     );
   }
 }
 
-class _RecipeTile extends StatelessWidget {
-  final RecipeEntity recipe;
-  const _RecipeTile({required this.recipe});
+/// Category picker UI with elegant Scandinavian design.
+class _CategoryPicker extends StatelessWidget {
+  final List<String> categories;
+  final Function(String) onSelect;
+
+  const _CategoryPicker({required this.categories, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        title: Text(
-          recipe.title,
-          style: GoogleFonts.playfairDisplay(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF2D3436),
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Text(
+              AppLocalizations.of(context)!.recipes,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              ),
+            ),
           ),
-        ),
-        subtitle: recipe.servings != null || recipe.prepTime != null
-            ? Text(
-                [
-                  if (recipe.servings != null) recipe.servings!,
-                  if (recipe.prepTime != null) recipe.prepTime!,
-                ].join(' · '),
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF636E72),
+          ...categories.map(
+            (cat) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OutlinedButton(
+                onPressed: () => onSelect(cat),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: theme.dividerColor),
                 ),
-              )
-            : null,
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: Color(0xFFB2BEC3),
-        ),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RecipeViewScreen(recipe: recipe)),
-        ),
+                child: Text(
+                  cat,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Recipe list tile with optional thumbnail.
+class _RecipeTile extends StatelessWidget {
+  final Recipe recipe;
+  final List<Recipe> peerRecipes;
+  final int index;
+
+  const _RecipeTile({
+    required this.recipe,
+    required this.peerRecipes,
+    required this.index,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = [
+      if (recipe.recipeYield.isNotEmpty) recipe.recipeYield,
+      if (recipe.prepTime.isNotEmpty) recipe.prepTime,
+    ].join(' · ');
+
+    return ListTile(
+      leading: recipe.image.isNotEmpty
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: CachedNetworkImage(
+                  imageUrl: recipe.image,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, size: 24),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, size: 24),
+                  ),
+                ),
+              ),
+            )
+          : null,
+      title: Text(recipe.name),
+      subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RecipeViewScreen(
+              recipe: recipe,
+              recipeSequence: peerRecipes,
+              initialSequenceIndex: index,
+            ),
+          ),
+        );
+      },
     );
   }
 }

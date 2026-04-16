@@ -104,23 +104,17 @@ abstract class AppLocalizations {
   /// **'SMAG'**
   String get appTitle;
 
-  /// No description provided for @gridTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Your Week'**
-  String get gridTitle;
-
-  /// No description provided for @emptySlot.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Recipe'**
-  String get emptySlot;
-
   /// No description provided for @recipes.
   ///
   /// In en, this message translates to:
   /// **'Recipes'**
   String get recipes;
+
+  /// No description provided for @grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get grid;
 
   /// No description provided for @search.
   ///
@@ -128,23 +122,11 @@ abstract class AppLocalizations {
   /// **'Search'**
   String get search;
 
-  /// No description provided for @searchHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Search recipes…'**
-  String get searchHint;
-
   /// No description provided for @noRecipes.
   ///
   /// In en, this message translates to:
   /// **'No recipes yet. Import or create one!'**
   String get noRecipes;
-
-  /// No description provided for @noResults.
-  ///
-  /// In en, this message translates to:
-  /// **'No results found.'**
-  String get noResults;
 
   /// No description provided for @newRecipe.
   ///
@@ -164,11 +146,11 @@ abstract class AppLocalizations {
   /// **'Delete Recipe'**
   String get deleteRecipe;
 
-  /// No description provided for @deleteConfirm.
+  /// No description provided for @deleteRecipeConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete \"{title}\"?'**
-  String deleteConfirm(String title);
+  /// **'Are you sure you want to delete this recipe?'**
+  String get deleteRecipeConfirm;
 
   /// No description provided for @save.
   ///
@@ -188,71 +170,89 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get delete;
 
-  /// No description provided for @overwrite.
+  /// No description provided for @close.
   ///
   /// In en, this message translates to:
-  /// **'Overwrite'**
-  String get overwrite;
+  /// **'Close'**
+  String get close;
 
-  /// No description provided for @overwriteTitle.
+  /// No description provided for @importTitle.
   ///
   /// In en, this message translates to:
-  /// **'Recipe Exists'**
-  String get overwriteTitle;
-
-  /// No description provided for @overwriteMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'\"{title}\" already exists. Overwrite?'**
-  String overwriteMessage(String title);
-
-  /// No description provided for @importRecipe.
-  ///
-  /// In en, this message translates to:
-  /// **'Import Recipe'**
-  String get importRecipe;
+  /// **'Import'**
+  String get importTitle;
 
   /// No description provided for @importFromUrl.
   ///
   /// In en, this message translates to:
-  /// **'Import from URL'**
+  /// **'From URL'**
   String get importFromUrl;
 
   /// No description provided for @importFromText.
   ///
   /// In en, this message translates to:
-  /// **'Import from Text'**
+  /// **'From Text'**
   String get importFromText;
 
-  /// No description provided for @urlHint.
+  /// No description provided for @importButton.
   ///
   /// In en, this message translates to:
-  /// **'Paste recipe URL…'**
-  String get urlHint;
+  /// **'Import'**
+  String get importButton;
 
-  /// No description provided for @textHint.
+  /// No description provided for @importLocally.
   ///
   /// In en, this message translates to:
-  /// **'Paste recipe text…'**
-  String get textHint;
+  /// **'Import Locally'**
+  String get importLocally;
 
-  /// No description provided for @importing.
+  /// No description provided for @sendToNextcloud.
   ///
   /// In en, this message translates to:
-  /// **'Importing…'**
-  String get importing;
+  /// **'Send to Nextcloud'**
+  String get sendToNextcloud;
 
-  /// No description provided for @importSuccess.
+  /// No description provided for @sentToNextcloud.
   ///
   /// In en, this message translates to:
-  /// **'Recipe imported successfully!'**
-  String get importSuccess;
+  /// **'Recipe sent to Nextcloud'**
+  String get sentToNextcloud;
 
-  /// No description provided for @importError.
+  /// No description provided for @importedRecipe.
   ///
   /// In en, this message translates to:
-  /// **'Could not import recipe.'**
-  String get importError;
+  /// **'Imported recipe'**
+  String get importedRecipe;
+
+  /// No description provided for @copyPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Prompt'**
+  String get copyPrompt;
+
+  /// No description provided for @promptCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt copied to clipboard'**
+  String get promptCopied;
+
+  /// No description provided for @pasteRecipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste JSON or recipe text here…'**
+  String get pasteRecipeHint;
+
+  /// No description provided for @selectImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Image'**
+  String get selectImage;
+
+  /// No description provided for @skip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skip;
 
   /// No description provided for @title.
   ///
@@ -260,11 +260,23 @@ abstract class AppLocalizations {
   /// **'Title'**
   String get title;
 
+  /// No description provided for @titleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Title is required'**
+  String get titleRequired;
+
   /// No description provided for @category.
   ///
   /// In en, this message translates to:
   /// **'Category'**
   String get category;
+
+  /// No description provided for @description.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get description;
 
   /// No description provided for @ingredients.
   ///
@@ -272,41 +284,23 @@ abstract class AppLocalizations {
   /// **'Ingredients'**
   String get ingredients;
 
+  /// No description provided for @ingredientsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One ingredient per line'**
+  String get ingredientsHint;
+
   /// No description provided for @instructions.
   ///
   /// In en, this message translates to:
   /// **'Instructions'**
   String get instructions;
 
-  /// No description provided for @pickDirectory.
+  /// No description provided for @instructionsHint.
   ///
   /// In en, this message translates to:
-  /// **'Select Recipe Folder'**
-  String get pickDirectory;
-
-  /// No description provided for @pickDirectoryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose the directory where your recipes are stored.'**
-  String get pickDirectoryHint;
-
-  /// No description provided for @removeFromGrid.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove from grid'**
-  String get removeFromGrid;
-
-  /// No description provided for @assignToGrid.
-  ///
-  /// In en, this message translates to:
-  /// **'Add to grid'**
-  String get assignToGrid;
-
-  /// No description provided for @cookMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Cook Mode'**
-  String get cookMode;
+  /// **'One step per line'**
+  String get instructionsHint;
 
   /// No description provided for @servings.
   ///
@@ -326,11 +320,17 @@ abstract class AppLocalizations {
   /// **'Cook Time'**
   String get cookTime;
 
-  /// No description provided for @recipePickerTitle.
+  /// No description provided for @imageUrl.
   ///
   /// In en, this message translates to:
-  /// **'Choose a Recipe'**
-  String get recipePickerTitle;
+  /// **'Image URL'**
+  String get imageUrl;
+
+  /// No description provided for @keywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Keywords'**
+  String get keywords;
 
   /// No description provided for @settings.
   ///
@@ -338,29 +338,143 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
-  /// No description provided for @storageDirectory.
+  /// No description provided for @syncManagement.
   ///
   /// In en, this message translates to:
-  /// **'Storage Directory'**
-  String get storageDirectory;
+  /// **'Nextcloud Sync'**
+  String get syncManagement;
 
-  /// No description provided for @notSet.
+  /// No description provided for @syncNow.
   ///
   /// In en, this message translates to:
-  /// **'Not set'**
-  String get notSet;
+  /// **'Sync Now'**
+  String get syncNow;
 
-  /// No description provided for @dragToRemove.
+  /// No description provided for @syncComplete.
   ///
   /// In en, this message translates to:
-  /// **'Drag here to remove'**
-  String get dragToRemove;
+  /// **'Sync complete: {details}'**
+  String syncComplete(String details);
 
-  /// No description provided for @categoryUncategorized.
+  /// No description provided for @connectNextcloud.
   ///
   /// In en, this message translates to:
-  /// **'Uncategorized'**
-  String get categoryUncategorized;
+  /// **'Connect Nextcloud'**
+  String get connectNextcloud;
+
+  /// No description provided for @connectNextcloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Link your Nextcloud Cookbook to sync recipes'**
+  String get connectNextcloudHint;
+
+  /// No description provided for @disconnectAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect Account'**
+  String get disconnectAccount;
+
+  /// No description provided for @disconnectConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect from Nextcloud? Local recipes will remain.'**
+  String get disconnectConfirm;
+
+  /// No description provided for @disconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get disconnect;
+
+  /// No description provided for @noAccountLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'No account linked'**
+  String get noAccountLinked;
+
+  /// No description provided for @themeSelector.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get themeSelector;
+
+  /// No description provided for @lightTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get lightTheme;
+
+  /// No description provided for @oledDarkTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'OLED Dark'**
+  String get oledDarkTheme;
+
+  /// No description provided for @languageSelector.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get languageSelector;
+
+  /// No description provided for @about.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get about;
+
+  /// No description provided for @githubRepo.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub Repository'**
+  String get githubRepo;
+
+  /// No description provided for @philosophy.
+  ///
+  /// In en, this message translates to:
+  /// **'Philosophy (FOSS ❤)'**
+  String get philosophy;
+
+  /// No description provided for @philosophyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why SMAG?'**
+  String get philosophyTitle;
+
+  /// No description provided for @philosophyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'SMAG is Free and Open Source Software, built as a counter-movement to noisy, ad-filled cooking apps.\n\nYour recipes are yours. No accounts, no tracking, no cloud dependency. When you choose to sync via Nextcloud, your data stays on infrastructure you control.'**
+  String get philosophyBody;
+
+  /// No description provided for @shoppingList.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping List'**
+  String get shoppingList;
+
+  /// No description provided for @conflictTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Conflict'**
+  String get conflictTitle;
+
+  /// No description provided for @conflictMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This recipe was changed both locally and on the server. Which version do you want to keep?'**
+  String get conflictMessage;
+
+  /// No description provided for @keepLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Local'**
+  String get keepLocal;
+
+  /// No description provided for @keepServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Server'**
+  String get keepServer;
 }
 
 class _AppLocalizationsDelegate

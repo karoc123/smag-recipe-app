@@ -1,6 +1,6 @@
 ### _The Scandinavian Digital Cookbook_
 
-**SMAG** (Danish/Norwegian for "Taste" or "Flavor") is a manifesto for **Quiet Software**. It is an open-source recipe manager built as a counter-movement to noisy, ad-filled, and cloud-dependent applications. This is a serene, secure vault for culinary knowledge—a tool designed to respect the human being behind the screen.
+**SMAG** (Danish/Norwegian for "Taste" or "Flavor") is **Quiet Software**. It is an open-source recipe manager built as a counter-movement to noisy, ad-filled, and cloud-dependent applications. This is a serene, secure vault for culinary knowledge—a tool designed to respect the human being behind the screen.
 
 ---
 
@@ -8,9 +8,9 @@
 
 This is software built on a foundation of intentional restraint.
 
-- **Privacy by Design:** There are no accounts and no tracking. Data remains strictly local. The user is the sole owner of their information.
+- **Privacy by Design:** There are no accounts and no tracking. Data remains strictly local by default. Optional Nextcloud sync keeps data on infrastructure the user controls.
 - **No "Gedöns" (No Noise):** There is a deliberate rejection of social feeds, "smart" recommendations, or gamification. This is a focused tool, not a time-thief.
-- **Built for Longevity:** This project prioritizes decades over trends. By utilizing plain Markdown files, recipes remain readable and portable forever, independent of the existence of the app itself.
+- **Built for Longevity:** This project prioritizes decades over trends. By utilizing the Nextcloud Cookbook JSON schema (schema.org Recipe), recipes remain portable and interoperable with the open ecosystem.
 
 ## 2. Design Language: Scandinavian Clarity
 
@@ -24,20 +24,20 @@ The aesthetic follows the Northern tradition where **form follows function**, wr
 
 ### I. The Recipe Vault (Data Sovereignty)
 
-This is a system that treats recipes as digital heirlooms. Everything is stored as **Markdown files** directly on the local file system.
+This is a system that treats recipes as digital heirlooms. Everything is stored locally in **SQLite** using the **Nextcloud Cookbook JSON schema**.
 
-- **Simplicity:** Plain text is used because it is lightweight, universal, and future-proof.
-- **Transparency:** Recipes can be opened, edited, or backed up with any standard text editor or synced via Nextcloud without proprietary barriers.
+- **Interoperability:** The schema.org Recipe format ensures recipes can be synced with Nextcloud Cookbook, exported, or processed by any tool understanding this standard.
+- **Transparency:** Recipes can be synced via the Nextcloud Cookbook Plugin, keeping data on self-hosted infrastructure without proprietary barriers.
 
-### II. The 7-Day Rhythm (The Grid)
+### II. The Meal Planner Grid
 
-Meal planning is stripped of its administrative burden. The rigid calendar is replaced by a **visual grid of seven squares**.
+Meal planning is stripped of its administrative burden. The rigid calendar is replaced by a **visual grid of squares**.
 
 - **Intuition over Logistics:** Favorites are simply dragged and dropped into the weekly cycle.
-- **Flexibility:** An empty slot with a subtle `+` icon is an invitation for spontaneity, not a reminder of a failure to plan.
+- **Flexibility:** An empty slot is an invitation for spontaneity, not a reminder of a failure to plan.
 - **Clarity:** The grid provides a beautiful, gallery-like overview of the week at a single glance.
 
-### III. The Cooking Ritual (The Experience)
+### III. The Cooking Ritual
 
 At the stove, the app transforms into a dedicated kitchen assistant.
 

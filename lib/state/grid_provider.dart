@@ -1,42 +1,69 @@
 import 'package:flutter/foundation.dart';
 
-import '../domain/recipe_entity.dart';
 import '../services/config_service.dart';
+import '../domain/recipe.dart';
+import '../data/recipe_database.dart';
 
-/// State holder for the 7-slot weekly grid.
+/// State holder for the 7-slot weekly planning grid.
 class GridProvider extends ChangeNotifier {
   final ConfigService _config;
+  final RecipeDatabase _db;
 
-  GridProvider(this._config);
+  Map<int, int?> _slots = {};
 
-  List<String> get slots => _config.slots;
-  int get slotCount => _config.slots.length;
+  GridProvider(this._config, this._db);
 
-  /// Assign a recipe to an empty slot.
-  Future<void> assign(int index, RecipeEntity recipe) async {
-    if (recipe.relativePath == null) return;
-    await _config.setSlot(index, recipe.relativePath!);
+  int get slotCount => ConfigService.slotCount;
+
+  /// Load slot assignments from the database.
+  Future<void> load() async {
+    _slots = await _config.getSlots();
     notifyListeners();
   }
 
-  /// Remove a recipe from a slot (the intuitive "drag-to-remove" or long-press).
+  /// The local recipe id at [index], or null if empty.
+  int? recipeIdAt(int index) => _slots[index];
+
+  bool isFilled(int index) => _slots[index] != null;
+
+  /// Assign a recipe to a slot.
+  Future<void> assign(int index, Recipe recipe) async {
+    if (recipe.localId == null) return;
+    await _config.setSlot(index, recipe.localId!);
+    _slots[index] = recipe.localId;
+    notifyListeners();
+  }
+
+  /// Clear a slot.
   Future<void> clear(int index) async {
     await _config.clearSlot(index);
+    _slots[index] = null;
     notifyListeners();
   }
 
-  /// Swap two slots during drag-and-drop reorder.
+  /// Clear all slots.
+  Future<void> clearAll() async {
+    for (int i = 0; i < slotCount; i++) {
+      await _config.clearSlot(i);
+      _slots[i] = null;
+    }
+    notifyListeners();
+  }
+
+  /// Swap two slots (for drag-and-drop).
   Future<void> swap(int from, int to) async {
     await _config.swapSlots(from, to);
+    final tmp = _slots[from];
+    _slots[from] = _slots[to];
+    _slots[to] = tmp;
     notifyListeners();
   }
 
-  /// Check if a specific slot is filled.
-  bool isFilled(int index) => slots[index].isNotEmpty;
-
-  /// Get the relative path for a slot, or null if empty.
-  String? pathAt(int index) {
-    final val = slots[index];
-    return val.isEmpty ? null : val;
+  /// Resolve the full recipe for a slot. Returns null if the slot is empty or
+  /// the recipe was deleted.
+  Future<Recipe?> recipeAt(int index) async {
+    final id = _slots[index];
+    if (id == null) return null;
+    return _db.getByLocalId(id);
   }
 }

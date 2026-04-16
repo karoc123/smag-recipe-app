@@ -1,20 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:smag/l10n/app_localizations.dart';
 
-import '../domain/recipe_entity.dart';
+import '../domain/recipe.dart';
+import '../l10n/app_localizations.dart';
 import '../state/grid_provider.dart';
-import '../state/recipe_provider.dart';
-import '../services/config_service.dart';
-import '../services/webdav_sync_service.dart';
-import 'recipe_home_screen.dart';
 import 'recipe_picker_dialog.dart';
 import 'recipe_view_screen.dart';
-import 'import_screen.dart';
-import 'recipe_edit_screen.dart';
 
+/// 7-slot weekly meal planning grid with drag-and-drop and images.
 class GridScreen extends StatefulWidget {
   const GridScreen({super.key});
 
@@ -23,482 +18,435 @@ class GridScreen extends StatefulWidget {
 }
 
 class _GridScreenState extends State<GridScreen> {
-  bool _showRemoveZone = false;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final grid = context.watch<GridProvider>();
-    final recipes = context.watch<RecipeProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2ED),
       appBar: AppBar(
-        title: Text(
-          l10n.gridTitle,
-          style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.w700),
-        ),
-        backgroundColor: const Color(0xFFF5F2ED),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: const Color(0xFF2D3436),
+        title: Text(l10n.grid),
         actions: [
           IconButton(
-            icon: const Icon(Icons.list_rounded),
-            tooltip: l10n.recipes,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const RecipeHomeScreen()),
-            ),
+            icon: const Icon(Icons.shopping_cart),
+            onPressed: () => _showShoppingList(context),
+            tooltip: l10n.shoppingList,
           ),
           IconButton(
-            icon: const Icon(Icons.download_rounded),
-            tooltip: l10n.importRecipe,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ImportScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.cloud_sync_outlined),
-            tooltip: 'WebDAV Sync',
-            onPressed: _openWebDavSettings,
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _clearAllSlots(context),
+            tooltip: l10n.deleteRecipeConfirm,
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF6B8F71),
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RecipeEditScreen()),
-        ),
-        child: const Icon(Icons.add),
+      body: _GridBody(
+        isDragging: _isDragging,
+        onDragStart: () => setState(() => _isDragging = true),
+        onDragEnd: () => setState(() => _isDragging = false),
       ),
-      body: _buildGrid(context, l10n, grid, recipes),
     );
   }
 
-  Widget _buildGrid(
-    BuildContext context,
-    AppLocalizations l10n,
-    GridProvider grid,
-    RecipeProvider recipes,
-  ) {
-    return Column(
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: GridView.builder(
-              itemCount: grid.slotCount,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.0,
-              ),
-              itemBuilder: (ctx, index) {
-                final path = grid.pathAt(index);
-                final recipe = path != null ? recipes.getByPath(path) : null;
-                return _buildSlot(context, l10n, index, recipe, grid);
-              },
-            ),
-          ),
-        ),
-        // Drag-to-remove zone — slides up when dragging
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: _showRemoveZone ? 72 : 0,
-          child: _showRemoveZone
-              ? DragTarget<int>(
-                  onWillAcceptWithDetails: (_) => true,
-                  onAcceptWithDetails: (details) {
-                    context.read<GridProvider>().clear(details.data);
-                    setState(() => _showRemoveZone = false);
-                  },
-                  builder: (ctx, candidateData, _) {
-                    final hovering = candidateData.isNotEmpty;
-                    return Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      decoration: BoxDecoration(
-                        color: hovering
-                            ? Colors.red.shade100
-                            : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: hovering ? Colors.red : Colors.red.shade200,
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              color: hovering
-                                  ? Colors.red
-                                  : Colors.red.shade300,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              l10n.dragToRemove,
-                              style: TextStyle(
-                                color: hovering
-                                    ? Colors.red
-                                    : Colors.red.shade300,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
+  void _showShoppingList(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final grid = context.read<GridProvider>();
 
-  Widget _buildSlot(
-    BuildContext context,
-    AppLocalizations l10n,
-    int index,
-    RecipeEntity? recipe,
-    GridProvider grid,
-  ) {
-    if (recipe == null) {
-      return _buildEmptySlot(context, l10n, index, grid);
-    }
-    return _buildFilledSlot(context, index, recipe, grid);
-  }
-
-  Widget _buildEmptySlot(
-    BuildContext context,
-    AppLocalizations l10n,
-    int index,
-    GridProvider grid,
-  ) {
-    return DragTarget<int>(
-      onWillAcceptWithDetails: (details) => details.data != index,
-      onAcceptWithDetails: (details) {
-        grid.swap(details.data, index);
-        setState(() => _showRemoveZone = false);
-      },
-      builder: (ctx, candidateData, _) {
-        final hovering = candidateData.isNotEmpty;
-        return GestureDetector(
-          onTap: () => _pickRecipeForSlot(context, index),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              color: hovering ? const Color(0xFFD5E8D4) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: hovering
-                    ? const Color(0xFF6B8F71)
-                    : const Color(0xFFDDD8D0),
-                width: hovering ? 2 : 1.5,
-                strokeAlign: BorderSide.strokeAlignInside,
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.add_rounded,
-                    size: 36,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.emptySlot,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: Colors.grey.shade400,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFilledSlot(
-    BuildContext context,
-    int index,
-    RecipeEntity recipe,
-    GridProvider grid,
-  ) {
-    final rootDir = context.read<ConfigService>().rootDir!;
-
-    Widget card = DragTarget<int>(
-      onWillAcceptWithDetails: (details) => details.data != index,
-      onAcceptWithDetails: (details) {
-        grid.swap(details.data, index);
-        setState(() => _showRemoveZone = false);
-      },
-      builder: (ctx, candidateData, _) {
-        final hovering = candidateData.isNotEmpty;
-        return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => RecipeViewScreen(recipe: recipe)),
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: hovering
-                  ? Border.all(color: const Color(0xFF6B8F71), width: 3)
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _slotImage(rootDir, recipe),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                        stops: const [0.4, 1.0],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    left: 10,
-                    right: 10,
-                    child: Text(
-                      recipe.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    return LongPressDraggable<int>(
-      data: index,
-      feedback: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          width: 140,
-          height: 140,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _slotImage(rootDir, recipe),
-                Container(color: Colors.black.withValues(alpha: 0.3)),
-                Center(
-                  child: Text(
-                    recipe.title,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      childWhenDragging: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFE8E4DE),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFDDD8D0), width: 1.5),
-        ),
-      ),
-      onDragStarted: () => setState(() => _showRemoveZone = true),
-      onDragEnd: (_) => setState(() => _showRemoveZone = false),
-      child: card,
-    );
-  }
-
-  Widget _slotImage(String rootDir, RecipeEntity recipe) {
-    if (recipe.imagePath != null && recipe.imagePath!.isNotEmpty) {
-      final cleaned = recipe.imagePath!.startsWith('/')
-          ? recipe.imagePath!.substring(1)
-          : recipe.imagePath!;
-      final file = File('$rootDir/$cleaned');
-      if (file.existsSync()) {
-        return Image.file(file, fit: BoxFit.cover);
+    // Aggregate all ingredients from filled slots
+    final allIngredients = <String>[];
+    for (int i = 0; i < grid.slotCount; i++) {
+      if (grid.isFilled(i)) {
+        final recipe = await grid.recipeAt(i);
+        if (recipe != null) {
+          allIngredients.addAll(recipe.recipeIngredient);
+        }
       }
     }
-    return Container(
-      color: const Color(0xFFD5CFC7),
-      child: Center(
-        child: Icon(
-          Icons.restaurant_rounded,
-          size: 40,
-          color: Colors.grey.shade500,
-        ),
-      ),
-    );
-  }
 
-  Future<void> _pickRecipeForSlot(BuildContext context, int index) async {
-    final gridProvider = context.read<GridProvider>();
-    final recipe = await showModalBottomSheet<RecipeEntity>(
+    if (!context.mounted) return;
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const RecipePickerDialog(),
-    );
-    if (recipe != null && mounted) {
-      gridProvider.assign(index, recipe);
-    }
-  }
-
-  Future<void> _openWebDavSettings() async {
-    final syncService = context.read<WebDavSyncService>();
-    final config = await syncService.loadConfig();
-
-    if (!mounted) return;
-
-    final enabled = ValueNotifier<bool>(config.enabled);
-    final urlCtrl = TextEditingController(text: config.baseUrl);
-    final userCtrl = TextEditingController(text: config.username);
-    final pwdCtrl = TextEditingController(text: config.password);
-    final pathCtrl = TextEditingController(text: config.remotePath);
-
-    final shouldSync = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('WebDAV Sync'),
+      builder: (_) => AlertDialog(
+        title: Text(l10n.shoppingList),
         content: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: [
-              ValueListenableBuilder<bool>(
-                valueListenable: enabled,
-                builder: (ctx, isEnabled, _) => SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Enable sync'),
-                  value: isEnabled,
-                  onChanged: (v) => enabled.value = v,
-                ),
-              ),
-              TextField(
-                controller: urlCtrl,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(labelText: 'Server URL'),
-              ),
-              TextField(
-                controller: userCtrl,
-                decoration: const InputDecoration(labelText: 'Username'),
-              ),
-              TextField(
-                controller: pwdCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Password / App token',
-                ),
-              ),
-              TextField(
-                controller: pathCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Remote path (e.g. /smag)',
-                ),
-              ),
-            ],
+            children: allIngredients.isEmpty
+                ? [Text(l10n.noRecipes)]
+                : allIngredients
+                      .map(
+                        (ing) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('• '),
+                              Expanded(child: Text(ing)),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Close'),
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
           ),
           FilledButton(
-            onPressed: () async {
-              final newConfig = WebDavConfig(
-                enabled: enabled.value,
-                baseUrl: urlCtrl.text.trim(),
-                username: userCtrl.text.trim(),
-                password: pwdCtrl.text,
-                remotePath: pathCtrl.text.trim(),
-              );
-              await syncService.saveConfig(newConfig);
-              if (!ctx.mounted) return;
-              Navigator.pop(ctx, true);
+            onPressed: () {
+              _copyIngredientsToClipboard(allIngredients);
+              Navigator.pop(context);
             },
-            child: const Text('Save & Sync'),
+            child: Text(l10n.copyPrompt),
           ),
         ],
       ),
     );
+  }
 
-    enabled.dispose();
-    urlCtrl.dispose();
-    userCtrl.dispose();
-    pwdCtrl.dispose();
-    pathCtrl.dispose();
+  void _copyIngredientsToClipboard(List<String> ingredients) {
+    final text = ingredients.join('\n');
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.promptCopied)),
+    );
+  }
 
-    if (shouldSync != true || !mounted) return;
+  void _clearAllSlots(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
 
-    final rootDir = context.read<ConfigService>().rootDir;
-    if (rootDir == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.deleteRecipe),
+        content: Text(l10n.deleteRecipeConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              context.read<GridProvider>().clearAll();
+              Navigator.pop(ctx);
+            },
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Sync started...')));
-    try {
-      final result = await syncService.syncLocalToRemote(rootDir);
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sync finished: ${result.uploadedFiles} files uploaded.',
+class _GridBody extends StatelessWidget {
+  final bool isDragging;
+  final VoidCallback onDragStart;
+  final VoidCallback onDragEnd;
+
+  const _GridBody({
+    required this.isDragging,
+    required this.onDragStart,
+    required this.onDragEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grid = context.watch<GridProvider>();
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: grid.slotCount + (isDragging ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (isDragging && index == grid.slotCount) {
+            return _DeleteSlot(onDragStart: onDragStart, onDragEnd: onDragEnd);
+          }
+          return _GridSlot(
+            index: index,
+            onDragStart: onDragStart,
+            onDragEnd: onDragEnd,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GridSlot extends StatelessWidget {
+  final int index;
+  final VoidCallback onDragStart;
+  final VoidCallback onDragEnd;
+
+  const _GridSlot({
+    required this.index,
+    required this.onDragStart,
+    required this.onDragEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grid = context.watch<GridProvider>();
+    final filled = grid.isFilled(index);
+
+    if (!filled) {
+      return _EmptySlot(index: index);
+    }
+
+    return FutureBuilder<Recipe?>(
+      future: grid.recipeAt(index),
+      builder: (context, snapshot) {
+        final recipe = snapshot.data;
+        if (recipe == null) {
+          return _EmptySlot(index: index);
+        }
+        return _FilledSlot(
+          index: index,
+          recipe: recipe,
+          onDragStart: onDragStart,
+          onDragEnd: onDragEnd,
+        );
+      },
+    );
+  }
+}
+
+class _EmptySlot extends StatelessWidget {
+  final int index;
+
+  const _EmptySlot({required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DragTarget<int>(
+      onAcceptWithDetails: (details) {
+        final grid = context.read<GridProvider>();
+        grid.swap(details.data, index);
+      },
+      builder: (context, candidateData, rejectedData) {
+        final hovering = candidateData.isNotEmpty;
+        return Card(
+          color: hovering
+              ? theme.colorScheme.primaryContainer
+              : theme.cardTheme.color,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _pickRecipe(context, index),
+            child: Center(
+              child: Icon(
+                Icons.add,
+                size: 32,
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.5,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickRecipe(BuildContext context, int index) async {
+    final recipe = await showModalBottomSheet<Recipe>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const RecipePickerDialog(),
+    );
+    if (recipe != null && context.mounted) {
+      context.read<GridProvider>().assign(index, recipe);
+    }
+  }
+}
+
+/// Delete target tile that appears during drag.
+class _DeleteSlot extends StatelessWidget {
+  final VoidCallback onDragStart;
+  final VoidCallback onDragEnd;
+
+  const _DeleteSlot({required this.onDragStart, required this.onDragEnd});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DragTarget<int>(
+      onAcceptWithDetails: (details) {
+        context.read<GridProvider>().clear(details.data);
+        onDragEnd();
+      },
+      onLeave: (_) {
+        onDragEnd();
+      },
+      builder: (context, candidateData, rejectedData) {
+        final hovering = candidateData.isNotEmpty;
+        return Card(
+          color: hovering
+              ? theme.colorScheme.errorContainer
+              : theme.cardTheme.color,
+          child: Center(
+            child: Icon(
+              Icons.delete_outline,
+              size: 32,
+              color: hovering
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FilledSlot extends StatelessWidget {
+  final int index;
+  final Recipe recipe;
+  final VoidCallback onDragStart;
+  final VoidCallback onDragEnd;
+
+  const _FilledSlot({
+    required this.index,
+    required this.recipe,
+    required this.onDragStart,
+    required this.onDragEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return LongPressDraggable<int>(
+      data: index,
+      onDragStarted: onDragStart,
+      onDragEnd: (_) => onDragEnd(),
+      feedback: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 140,
+          height: 140,
+          child: _RecipeTileContent(recipe: recipe),
+        ),
+      ),
+      childWhenDragging: Card(
+        color: theme.colorScheme.surfaceContainerHighest,
+        child: const SizedBox.expand(),
+      ),
+      child: DragTarget<int>(
+        onAcceptWithDetails: (details) {
+          context.read<GridProvider>().swap(details.data, index);
+          onDragEnd();
+        },
+        builder: (context, candidateData, _) {
+          return Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _viewRecipe(context),
+              onLongPress: () => _showRemoveOption(context),
+              child: _RecipeTileContent(recipe: recipe),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _viewRecipe(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => RecipeViewScreen(recipe: recipe)));
+  }
+
+  void _showRemoveOption(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: ListTile(
+            leading: const Icon(Icons.delete),
+            title: Text(AppLocalizations.of(context)!.deleteRecipe),
+            onTap: () {
+              Navigator.pop(context);
+              context.read<GridProvider>().clear(index);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Displays recipe as image with text overlay, or just text.
+class _RecipeTileContent extends StatelessWidget {
+  final Recipe recipe;
+
+  const _RecipeTileContent({required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (recipe.image.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Center(
+          child: Text(
+            recipe.name,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       );
-    } catch (_) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Sync failed. Check your WebDAV settings.'),
-        ),
-      );
     }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CachedNetworkImage(
+          imageUrl: recipe.image,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(color: Colors.grey[300]),
+          errorWidget: (_, __, ___) => Container(color: Colors.grey[300]),
+        ),
+        Container(color: Colors.black.withValues(alpha: 0.4)),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Center(
+            child: Text(
+              recipe.name,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                shadows: [
+                  Shadow(
+                    offset: const Offset(1, 1),
+                    blurRadius: 3,
+                    color: Colors.black.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -12,25 +12,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get appTitle => 'SMAG';
 
   @override
-  String get gridTitle => 'Deine Woche';
-
-  @override
-  String get emptySlot => 'Rezept hinzufügen';
-
-  @override
   String get recipes => 'Rezepte';
+
+  @override
+  String get grid => 'Wochenplan';
 
   @override
   String get search => 'Suche';
 
   @override
-  String get searchHint => 'Rezepte suchen…';
-
-  @override
   String get noRecipes => 'Noch keine Rezepte. Importiere oder erstelle eines!';
-
-  @override
-  String get noResults => 'Keine Ergebnisse gefunden.';
 
   @override
   String get newRecipe => 'Neues Rezept';
@@ -42,9 +33,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deleteRecipe => 'Rezept löschen';
 
   @override
-  String deleteConfirm(String title) {
-    return 'Möchtest du \"$title\" wirklich löschen?';
-  }
+  String get deleteRecipeConfirm =>
+      'Möchtest du dieses Rezept wirklich löschen?';
 
   @override
   String get save => 'Speichern';
@@ -56,67 +46,70 @@ class AppLocalizationsDe extends AppLocalizations {
   String get delete => 'Löschen';
 
   @override
-  String get overwrite => 'Überschreiben';
+  String get close => 'Schließen';
 
   @override
-  String get overwriteTitle => 'Rezept existiert';
+  String get importTitle => 'Import';
 
   @override
-  String overwriteMessage(String title) {
-    return '\"$title\" existiert bereits. Überschreiben?';
-  }
+  String get importFromUrl => 'Von URL';
 
   @override
-  String get importRecipe => 'Rezept importieren';
+  String get importFromText => 'Aus Text';
 
   @override
-  String get importFromUrl => 'Von URL importieren';
+  String get importButton => 'Importieren';
 
   @override
-  String get importFromText => 'Aus Text importieren';
+  String get importLocally => 'Lokal importieren';
 
   @override
-  String get urlHint => 'Rezept-URL einfügen…';
+  String get sendToNextcloud => 'An Nextcloud senden';
 
   @override
-  String get textHint => 'Rezepttext einfügen…';
+  String get sentToNextcloud => 'Rezept an Nextcloud gesendet';
 
   @override
-  String get importing => 'Importiere…';
+  String get importedRecipe => 'Importiertes Rezept';
 
   @override
-  String get importSuccess => 'Rezept erfolgreich importiert!';
+  String get copyPrompt => 'Prompt kopieren';
 
   @override
-  String get importError => 'Rezept konnte nicht importiert werden.';
+  String get promptCopied => 'Prompt in Zwischenablage kopiert';
+
+  @override
+  String get pasteRecipeHint => 'JSON oder Rezepttext hier einfügen…';
+
+  @override
+  String get selectImage => 'Bild auswählen';
+
+  @override
+  String get skip => 'Überspringen';
 
   @override
   String get title => 'Titel';
 
   @override
+  String get titleRequired => 'Titel ist erforderlich';
+
+  @override
   String get category => 'Kategorie';
+
+  @override
+  String get description => 'Beschreibung';
 
   @override
   String get ingredients => 'Zutaten';
 
   @override
+  String get ingredientsHint => 'Eine Zutat pro Zeile';
+
+  @override
   String get instructions => 'Zubereitung';
 
   @override
-  String get pickDirectory => 'Rezeptordner wählen';
-
-  @override
-  String get pickDirectoryHint =>
-      'Wähle den Ordner, in dem deine Rezepte gespeichert sind.';
-
-  @override
-  String get removeFromGrid => 'Aus der Woche entfernen';
-
-  @override
-  String get assignToGrid => 'Zur Woche hinzufügen';
-
-  @override
-  String get cookMode => 'Kochmodus';
+  String get instructionsHint => 'Ein Schritt pro Zeile';
 
   @override
   String get servings => 'Portionen';
@@ -128,20 +121,86 @@ class AppLocalizationsDe extends AppLocalizations {
   String get cookTime => 'Kochzeit';
 
   @override
-  String get recipePickerTitle => 'Rezept auswählen';
+  String get imageUrl => 'Bild-URL';
+
+  @override
+  String get keywords => 'Schlagwörter';
 
   @override
   String get settings => 'Einstellungen';
 
   @override
-  String get storageDirectory => 'Speicherort';
+  String get syncManagement => 'Nextcloud-Synchronisierung';
 
   @override
-  String get notSet => 'Nicht festgelegt';
+  String get syncNow => 'Jetzt synchronisieren';
 
   @override
-  String get dragToRemove => 'Hierher ziehen zum Entfernen';
+  String syncComplete(String details) {
+    return 'Synchronisierung abgeschlossen: $details';
+  }
 
   @override
-  String get categoryUncategorized => 'Unkategorisiert';
+  String get connectNextcloud => 'Nextcloud verbinden';
+
+  @override
+  String get connectNextcloudHint =>
+      'Verknüpfe dein Nextcloud Cookbook, um Rezepte zu synchronisieren';
+
+  @override
+  String get disconnectAccount => 'Konto trennen';
+
+  @override
+  String get disconnectConfirm =>
+      'Von Nextcloud trennen? Lokale Rezepte bleiben erhalten.';
+
+  @override
+  String get disconnect => 'Trennen';
+
+  @override
+  String get noAccountLinked => 'Kein Konto verknüpft';
+
+  @override
+  String get themeSelector => 'Design';
+
+  @override
+  String get lightTheme => 'Hell';
+
+  @override
+  String get oledDarkTheme => 'OLED Dunkel';
+
+  @override
+  String get languageSelector => 'Sprache';
+
+  @override
+  String get about => 'Über';
+
+  @override
+  String get githubRepo => 'GitHub-Repository';
+
+  @override
+  String get philosophy => 'Philosophie (FOSS ❤)';
+
+  @override
+  String get philosophyTitle => 'Warum SMAG?';
+
+  @override
+  String get philosophyBody =>
+      'SMAG ist freie und quelloffene Software – entwickelt als Gegenbewegung zu lauten, werbeüberladenen Koch-Apps.\n\nDeine Rezepte gehören dir. Keine Konten, kein Tracking, keine Cloud-Abhängigkeit. Wenn du über Nextcloud synchronisierst, bleiben deine Daten auf Infrastruktur, die du kontrollierst.';
+
+  @override
+  String get shoppingList => 'Einkaufsliste';
+
+  @override
+  String get conflictTitle => 'Synchronisierungskonflikt';
+
+  @override
+  String get conflictMessage =>
+      'Dieses Rezept wurde lokal und auf dem Server geändert. Welche Version möchtest du behalten?';
+
+  @override
+  String get keepLocal => 'Lokale Version';
+
+  @override
+  String get keepServer => 'Server-Version';
 }

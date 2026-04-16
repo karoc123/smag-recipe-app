@@ -61,3 +61,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.github.nextcloud:Android-SingleSignOn:0.8.1")
+    implementation("com.google.code.gson:gson:2.10.1")
+}

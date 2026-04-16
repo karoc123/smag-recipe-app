@@ -1,19 +1,24 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:smag/l10n/app_localizations.dart';
 
-import '../domain/recipe_entity.dart';
-import '../services/config_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+
+import '../domain/recipe.dart';
+import '../l10n/app_localizations.dart';
+import '../services/sync_service.dart';
 import '../state/recipe_provider.dart';
 import 'recipe_edit_screen.dart';
 
+/// Full-screen recipe reading view with wakelock, swipe navigation within a
+/// category sequence, and Markdown rendering of the instructions body.
 class RecipeViewScreen extends StatefulWidget {
-  final RecipeEntity recipe;
-  final List<RecipeEntity>? recipeSequence;
+  final Recipe recipe;
+
+  /// Optional ordered list for swipe navigation.
+  final List<Recipe>? recipeSequence;
   final int initialSequenceIndex;
 
   const RecipeViewScreen({
@@ -28,20 +33,14 @@ class RecipeViewScreen extends StatefulWidget {
 }
 
 class _RecipeViewScreenState extends State<RecipeViewScreen> {
-  late List<RecipeEntity> _sequence;
-  late int _index;
-  RecipeEntity get _recipe => _sequence[_index];
+  late Recipe _current;
+  late int _seqIndex;
 
   @override
   void initState() {
     super.initState();
-    _sequence =
-        widget.recipeSequence != null && widget.recipeSequence!.isNotEmpty
-        ? List<RecipeEntity>.from(widget.recipeSequence!)
-        : [widget.recipe];
-    _index = widget.recipeSequence != null
-        ? widget.initialSequenceIndex.clamp(0, _sequence.length - 1)
-        : 0;
+    _current = widget.recipe;
+    _seqIndex = widget.initialSequenceIndex;
     WakelockPlus.enable();
   }
 
@@ -51,269 +50,277 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
     super.dispose();
   }
 
+  bool get _hasSequence =>
+      widget.recipeSequence != null && widget.recipeSequence!.length > 1;
+
+  void _goToNext() {
+    if (!_hasSequence) return;
+    final seq = widget.recipeSequence!;
+    if (_seqIndex < seq.length - 1) {
+      setState(() {
+        _seqIndex++;
+        _current = seq[_seqIndex];
+      });
+    }
+  }
+
+  void _goToPrev() {
+    if (!_hasSequence) return;
+    if (_seqIndex > 0) {
+      setState(() {
+        _seqIndex--;
+        _current = widget.recipeSequence![_seqIndex];
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final rootDir = context.read<ConfigService>().rootDir;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF8F5),
-      body: CustomScrollView(
-        slivers: [
-          // Hero image or plain app bar
-          _buildAppBar(context, l10n, rootDir),
-          // Content
-          SliverToBoxAdapter(child: _buildContent(context, l10n, rootDir)),
+      appBar: AppBar(
+        title: Text(_current.name),
+        actions: [
+          if (_hasSequence)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  '${_seqIndex + 1} / ${widget.recipeSequence!.length}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _editRecipe(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _deleteRecipe(context),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAppBar(
-    BuildContext context,
-    AppLocalizations l10n,
-    String? rootDir,
-  ) {
-    final hasImage = _recipe.imagePath != null && _recipe.imagePath!.isNotEmpty;
-    Widget? background;
-    if (hasImage && rootDir != null) {
-      final cleaned = _recipe.imagePath!.startsWith('/')
-          ? _recipe.imagePath!.substring(1)
-          : _recipe.imagePath!;
-      final file = File('$rootDir/$cleaned');
-      if (file.existsSync()) {
-        background = Image.file(file, fit: BoxFit.cover);
-      }
-    }
-
-    return SliverAppBar(
-      expandedHeight: hasImage && background != null ? 280 : 0,
-      pinned: true,
-      backgroundColor: const Color(0xFFFAF8F5),
-      foregroundColor: const Color(0xFF2D3436),
-      flexibleSpace: background != null
-          ? FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  background,
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.5),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.edit_rounded),
-          tooltip: l10n.editRecipe,
-          onPressed: () async {
-            final updated = await Navigator.push<RecipeEntity>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RecipeEditScreen(recipe: _recipe),
-              ),
-            );
-            if (updated != null) {
-              setState(() {
-                _sequence[_index] = updated;
-              });
-            }
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete_outline_rounded),
-          tooltip: l10n.deleteRecipe,
-          onPressed: () => _confirmDelete(context, l10n),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContent(
-    BuildContext context,
-    AppLocalizations l10n,
-    String? rootDir,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: (details) {
-          final velocity = details.primaryVelocity ?? 0;
-          if (velocity < -200) {
-            _goToNextRecipe();
-          } else if (velocity > 200) {
-            _goToPreviousRecipe();
-          }
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: GestureDetector(
+        onHorizontalDragEnd: _hasSequence
+            ? (details) {
+                final velocity = details.primaryVelocity ?? 0;
+                if (velocity < -200) {
+                  _goToNext();
+                } else if (velocity > 200) {
+                  _goToPrev();
+                }
+              }
+            : null,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
-            if (_sequence.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Previous recipe',
-                      onPressed: _index > 0 ? _goToPreviousRecipe : null,
-                      icon: const Icon(Icons.chevron_left_rounded),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${_index + 1} / ${_sequence.length}',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF636E72),
+            // Image
+            if (_current.image.isNotEmpty) _buildImage(context),
+
+            // Metadata chips
+            _buildMetadata(context),
+
+            const SizedBox(height: 16),
+
+            // Ingredients
+            if (_current.recipeIngredient.isNotEmpty) ...[
+              Text(l10n.ingredients, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+              ..._current.recipeIngredient.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• '),
+                      Expanded(child: Text(item)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Instructions
+            if (_current.recipeInstructions.isNotEmpty) ...[
+              Text(l10n.instructions, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+              ..._current.recipeInstructions.asMap().entries.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '${e.key + 1}.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Next recipe',
-                      onPressed: _index < _sequence.length - 1
-                          ? _goToNextRecipe
-                          : null,
-                      icon: const Icon(Icons.chevron_right_rounded),
-                    ),
-                  ],
+                      Expanded(child: Text(e.value)),
+                    ],
+                  ),
                 ),
               ),
-            // Title
-            Text(
-              _recipe.title,
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF2D3436),
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Metadata row
-            if (_recipe.category.isNotEmpty ||
-                _recipe.servings != null ||
-                _recipe.prepTime != null ||
-                _recipe.cookTime != null)
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  if (_recipe.category.isNotEmpty)
-                    _chip(Icons.folder_outlined, _recipe.category),
-                  if (_recipe.servings != null)
-                    _chip(Icons.people_outline_rounded, _recipe.servings!),
-                  if (_recipe.prepTime != null)
-                    _chip(Icons.timer_outlined, _recipe.prepTime!),
-                  if (_recipe.cookTime != null)
-                    _chip(
-                      Icons.local_fire_department_outlined,
-                      _recipe.cookTime!,
-                    ),
-                ],
-              ),
-            const SizedBox(height: 24),
-            // Markdown body — strip Hugo shortcodes before rendering
-            MarkdownBody(
-              data: _stripShortcodes(_recipe.body),
-              styleSheet: MarkdownStyleSheet(
-                h2: GoogleFonts.playfairDisplay(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF2D3436),
-                ),
-                h3: GoogleFonts.playfairDisplay(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF2D3436),
-                ),
-                p: GoogleFonts.inter(
-                  fontSize: 16,
-                  height: 1.6,
-                  color: const Color(0xFF2D3436),
-                ),
-                listBullet: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: const Color(0xFF2D3436),
+              const SizedBox(height: 16),
+            ],
+
+            // Description (as Markdown fallback)
+            if (_current.description.isNotEmpty) ...[
+              MarkdownBody(data: _current.description),
+              const SizedBox(height: 16),
+            ],
+
+            // Source URL
+            if (_current.url.isNotEmpty) ...[
+              const Divider(),
+              InkWell(
+                onTap: () => _launchUrl(_current.url),
+                child: Text(
+                  'Source: ${_current.url}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ),
-              // ignore: deprecated_member_use
-              imageBuilder: (uri, title, alt) {
-                if (rootDir != null) {
-                  final cleaned = uri.path.startsWith('/')
-                      ? uri.path.substring(1)
-                      : uri.path;
-                  final file = File('$rootDir/$cleaned');
-                  if (file.existsSync()) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(file, fit: BoxFit.cover),
-                    );
-                  }
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+            ],
+
+            const SizedBox(height: 48),
           ],
         ),
       ),
     );
   }
 
-  void _goToNextRecipe() {
-    if (_index >= _sequence.length - 1) return;
-    setState(() => _index++);
-  }
+  Widget _buildImage(BuildContext context) {
+    final image = _current.image;
 
-  void _goToPreviousRecipe() {
-    if (_index <= 0) return;
-    setState(() => _index--);
-  }
+    // Local cached image for remote recipes.
+    if (_current.remoteId != null) {
+      return FutureBuilder<String?>(
+        future: SyncService.imagePath(_current.remoteId!),
+        builder: (context, snapshot) {
+          if (snapshot.data != null) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                File(snapshot.data!),
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            );
+          }
+          // Fall back to network image.
+          if (image.startsWith('http')) {
+            return _networkImage(image);
+          }
+          return const SizedBox.shrink();
+        },
+      );
+    }
 
-  Widget _chip(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: const Color(0xFF6B8F71)),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: const Color(0xFF636E72),
-          ),
+    if (image.startsWith('http')) {
+      return _networkImage(image);
+    }
+
+    // Local file path.
+    final file = File(image);
+    if (file.existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(
+          file,
+          height: 220,
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
-      ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _networkImage(String url) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.network(
+        url,
+        height: 220,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      ),
     );
   }
 
-  String _stripShortcodes(String md) {
-    // Remove Hugo shortcodes like {{< figure src="..." >}}
-    return md.replaceAll(RegExp(r'\{\{<[^>]*>\}\}'), '');
+  Widget _buildMetadata(BuildContext context) {
+    final chips = <Widget>[];
+
+    if (_current.recipeCategory.isNotEmpty) {
+      chips.add(
+        Chip(
+          avatar: const Icon(Icons.folder_outlined, size: 16),
+          label: Text(_current.recipeCategory),
+        ),
+      );
+    }
+    if (_current.recipeYield.isNotEmpty) {
+      chips.add(
+        Chip(
+          avatar: const Icon(Icons.people_outline, size: 16),
+          label: Text(_current.recipeYield),
+        ),
+      );
+    }
+    if (_current.prepTime.isNotEmpty) {
+      chips.add(
+        Chip(
+          avatar: const Icon(Icons.timer_outlined, size: 16),
+          label: Text(_formatDuration(_current.prepTime)),
+        ),
+      );
+    }
+    if (_current.cookTime.isNotEmpty) {
+      chips.add(
+        Chip(
+          avatar: const Icon(Icons.local_fire_department_outlined, size: 16),
+          label: Text(_formatDuration(_current.cookTime)),
+        ),
+      );
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(spacing: 8, runSpacing: 4, children: chips),
+    );
   }
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) async {
-    final provider = context.read<RecipeProvider>();
-    final nav = Navigator.of(context);
+  void _editRecipe(BuildContext context) async {
+    final result = await Navigator.of(context).push<Recipe>(
+      MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: _current)),
+    );
+    if (result != null && mounted) {
+      setState(() => _current = result);
+      context.read<RecipeProvider>().loadRecipes();
+    }
+  }
+
+  void _deleteRecipe(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.deleteRecipe),
-        content: Text(l10n.deleteConfirm(_recipe.title)),
+        content: Text(l10n.deleteRecipeConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -321,14 +328,51 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+            child: Text(l10n.delete),
           ),
         ],
       ),
     );
     if (confirmed == true && mounted) {
-      await provider.deleteRecipe(_recipe);
-      if (mounted) nav.pop();
+      final id = _current.localId;
+      if (id != null) {
+        await context.read<RecipeProvider>().deleteRecipe(id);
+      }
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  /// Parse ISO 8601 duration (PT20M30S) to human-readable (20 min).
+  String _formatDuration(String iso8601) {
+    if (iso8601.isEmpty) return '';
+
+    // Match ISO 8601 duration pattern: PT[nH][nM][nS]
+    final regex = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?');
+    final match = regex.firstMatch(iso8601);
+
+    if (match == null) return iso8601;
+
+    final hours = int.tryParse(match.group(1) ?? '') ?? 0;
+    final minutes = int.tryParse(match.group(2) ?? '') ?? 0;
+    final seconds = int.tryParse(match.group(3) ?? '') ?? 0;
+
+    final parts = <String>[];
+    if (hours > 0) parts.add('$hours h');
+    if (minutes > 0) parts.add('$minutes min');
+    if (seconds > 0) parts.add('$seconds s');
+
+    return parts.isNotEmpty ? parts.join(' ') : iso8601;
+  }
+
+  /// Launch URL if valid.
+  void _launchUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      // URL launch failed, ignore silently
     }
   }
 }
