@@ -192,6 +192,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingList => 'Einkaufsliste';
 
   @override
+  String get clearGrid => 'Grid leeren';
+
+  @override
+  String get clearGridConfirm => 'Möchtest du das gesamte Grid leeren?';
+
+  @override
+  String get sourceLabel => 'Quelle';
+
+  @override
   String get conflictTitle => 'Synchronisierungskonflikt';
 
   @override

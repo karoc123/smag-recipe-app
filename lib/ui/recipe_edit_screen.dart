@@ -76,6 +76,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isNew = widget.recipe == null || widget.recipe!.localId == null;
     final categories = context.read<RecipeProvider>().categories;
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       appBar: AppBar(
@@ -99,7 +101,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + insets + safeBottom),
             children: [
               // Name
               TextFormField(

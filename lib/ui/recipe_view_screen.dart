@@ -183,7 +183,7 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
               InkWell(
                 onTap: () => _launchUrl(_current.url),
                 child: Text(
-                  'Source: ${_current.url}',
+                  '${l10n.sourceLabel}: ${_current.url}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
                   ),

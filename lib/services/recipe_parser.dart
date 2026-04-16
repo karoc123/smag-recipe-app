@@ -37,8 +37,9 @@ class RecipeParser {
     // Try JSON-LD structured data first – this gives us the full schema.org
     // recipe in one shot.
     Recipe? jsonLdRecipe;
-    for (final script
-        in doc.querySelectorAll('script[type="application/ld+json"]')) {
+    for (final script in doc.querySelectorAll(
+      'script[type="application/ld+json"]',
+    )) {
       final text = script.text;
       if (text.contains('recipeIngredient') || text.contains('Recipe')) {
         jsonLdRecipe = _parseJsonLdRecipe(text);
@@ -73,10 +74,7 @@ class RecipeParser {
       ingredients = ingredientEls.map((e) => e.text.trim()).toList();
     }
     if (ingredients.isEmpty) {
-      ingredients = _extractSectionItems(doc, const [
-        'zutaten',
-        'ingredients',
-      ]);
+      ingredients = _extractSectionItems(doc, const ['zutaten', 'ingredients']);
     }
 
     final instructionEls = doc.querySelectorAll(
@@ -85,6 +83,24 @@ class RecipeParser {
     );
     if (instructionEls.isNotEmpty) {
       instructions = instructionEls.map((e) => e.text.trim()).toList();
+    }
+    if (instructions.isEmpty) {
+      final instructionContainers = doc.querySelectorAll(
+        '[itemprop="recipeInstructions"], .recipe-instructions, .instructions, .directions',
+      );
+      for (final container in instructionContainers) {
+        final paragraphs = container.querySelectorAll('p, div, span');
+        if (paragraphs.isNotEmpty) {
+          for (final p in paragraphs) {
+            final text = p.text.trim();
+            if (text.isNotEmpty) instructions.add(text);
+          }
+        } else {
+          final text = container.text.trim();
+          if (text.isNotEmpty) instructions.add(text);
+        }
+        if (instructions.isNotEmpty) break;
+      }
     }
     if (instructions.isEmpty) {
       instructions = _extractSectionItems(doc, const [
@@ -180,8 +196,7 @@ class RecipeParser {
         for (final item in decoded) {
           if (item is Map<String, dynamic>) {
             final type = item['@type'];
-            if (type == 'Recipe' ||
-                (type is List && type.contains('Recipe'))) {
+            if (type == 'Recipe' || (type is List && type.contains('Recipe'))) {
               return Recipe.fromJson(item);
             }
           }
@@ -223,36 +238,36 @@ class RecipeParser {
       if (decoded is! Map<String, dynamic>) return null;
 
       // Support both our own import schema and Nextcloud schema.
-      final name = (decoded['title'] ?? decoded['name'] ?? '').toString().trim();
+      final name = (decoded['title'] ?? decoded['name'] ?? '')
+          .toString()
+          .trim();
       if (name.isEmpty) return null;
 
-      final category =
-          (decoded['category'] ?? decoded['recipeCategory'] ?? '')
-              .toString()
-              .trim();
-      final recipeYield =
-          (decoded['servings'] ?? decoded['recipeYield'] ?? '')
-              .toString()
-              .trim();
-      final prepTime =
-          (decoded['prep_time'] ?? decoded['prepTime'] ?? '')
-              .toString()
-              .trim();
-      final cookTime =
-          (decoded['cook_time'] ?? decoded['cookTime'] ?? '')
-              .toString()
-              .trim();
+      final category = (decoded['category'] ?? decoded['recipeCategory'] ?? '')
+          .toString()
+          .trim();
+      final recipeYield = (decoded['servings'] ?? decoded['recipeYield'] ?? '')
+          .toString()
+          .trim();
+      final prepTime = (decoded['prep_time'] ?? decoded['prepTime'] ?? '')
+          .toString()
+          .trim();
+      final cookTime = (decoded['cook_time'] ?? decoded['cookTime'] ?? '')
+          .toString()
+          .trim();
       final image = (decoded['image'] ?? '').toString().trim();
-      final url =
-          (decoded['source_url'] ?? decoded['url'] ?? '').toString().trim();
+      final url = (decoded['source_url'] ?? decoded['url'] ?? '')
+          .toString()
+          .trim();
       final description = (decoded['description'] ?? '').toString().trim();
 
       List<String> ingredients = _toStringList(
-          decoded['ingredients'] ?? decoded['recipeIngredient']);
+        decoded['ingredients'] ?? decoded['recipeIngredient'],
+      );
       List<String> instructions = _toStringList(
-          decoded['instructions'] ?? decoded['recipeInstructions']);
-      List<String> tools =
-          _toStringList(decoded['tools'] ?? decoded['tool']);
+        decoded['instructions'] ?? decoded['recipeInstructions'],
+      );
+      List<String> tools = _toStringList(decoded['tools'] ?? decoded['tool']);
       final keywords = (decoded['keywords'] ?? '').toString().trim();
 
       return Recipe(
@@ -289,8 +304,9 @@ class RecipeParser {
     ];
 
     for (final raw in candidates) {
-      final normalized =
-          raw.replaceAll(RegExp(r'\s*[|–—-]\s*[^|–—-]+$'), '').trim();
+      final normalized = raw
+          .replaceAll(RegExp(r'\s*[|–—-]\s*[^|–—-]+$'), '')
+          .trim();
       if (normalized.isEmpty) continue;
       if (_isGenericSiteTitle(normalized)) continue;
       if (_looksLikeSectionHeading(normalized)) continue;

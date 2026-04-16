@@ -4,9 +4,10 @@
 
 ### 1. Storage Architecture
 
-- **Local-First:** All data resides in a local SQLite database (`recipes` + `grid_slots` tables).
+- **Local-First:** All data resides in a local SQLite database (`recipes` + `grid_slots` + `pending_deletions` tables).
 - **JSON Blob:** Each recipe row stores the full Nextcloud Cookbook JSON in a `json_data` column for lossless API round-tripping.
 - **Sync Status:** Each recipe tracks its state: `localOnly`, `synced`, `pendingUpload`, or `conflict`.
+- **Deferred Delete Queue:** Remote IDs of locally deleted synced recipes are queued and deleted on the next sync.
 
 ### 2. The SMAG Data Schema
 
@@ -30,7 +31,7 @@ Recipes follow the Nextcloud Cookbook JSON format:
 
 ### 3. Core Functional Pillars
 
-- **The Grid:** A 7-slot visual dashboard. Users assign recipes to slots via drag-and-drop or a picker dialog. Slots are managed in the `grid_slots` SQLite table.
+- **The Grid:** A dynamic visual dashboard with exactly one trailing empty (`+`) slot. During drag, the trailing slot becomes a delete target.
 - **The Search:** SQLite LIKE queries across recipe name, category, and ingredients.
 - **The Cook-Mode:** Integration of `wakelock` to keep the screen active.
 - **The Import Engine:**
@@ -41,6 +42,7 @@ Recipes follow the Nextcloud Cookbook JSON format:
   - Bidirectional sync comparing `dateModified` timestamps.
   - Manual trigger only (no background sync).
   - Conflict detection with user-facing resolution dialog (keep local / keep server).
+  - Pending remote deletions are executed first at sync start.
 
 ### 4. Authentication
 
@@ -58,6 +60,10 @@ Three-button `BottomNavigationBar`:
 3. **Settings** — sync management, theme, language, about
 
 Back button: Grid/Settings/Import always return to the main recipe overview.
+
+Android share integration:
+
+- `ACTION_SEND` (`text/plain`) and `ACTION_VIEW` (`http`/`https`) route URLs into the import flow.
 
 ### 6. Theming
 

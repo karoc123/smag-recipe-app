@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
 import '../state/recipe_provider.dart';
 import 'grid_screen.dart';
 import 'import_screen.dart';
+import 'recipe_edit_screen.dart';
 import 'recipe_list_screen.dart';
 import 'settings_screen.dart';
 
@@ -22,14 +24,28 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   static const intentChannel = MethodChannel('de.karoc.smag/intent');
   bool _showGrid = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkIntentUrl();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkIntentUrl();
+    }
   }
 
   /// Check if the app was launched with a URL intent (e.g., "Share with" URL).
@@ -46,9 +62,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _navigateToImportWithUrl(String url) {
-    // For now, just navigate to import screen
-    // TODO: In a future version, pre-fill the URL in the import screen
-    _navigateTo(context, const ImportScreen());
+    _navigateTo(context, ImportScreen(initialUrl: url));
   }
 
   @override
@@ -85,11 +99,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _createRecipe(BuildContext context) async {
-    // Push to recipe edit screen for new recipe.
     final result = await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const _NewRecipeRedirect()));
-    if (result == true && mounted) {
+    ).push<Recipe>(MaterialPageRoute(builder: (_) => const RecipeEditScreen()));
+    if (result != null && mounted) {
       context.read<RecipeProvider>().loadRecipes();
     }
   }
@@ -140,37 +153,5 @@ class _BottomBar extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-/// Tiny redirect widget that pushes to the recipe edit screen.
-class _NewRecipeRedirect extends StatelessWidget {
-  const _NewRecipeRedirect();
-
-  @override
-  Widget build(BuildContext context) {
-    // Redirect immediately — import the edit screen lazily.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) {
-            // Lazy import to avoid circular dependency.
-            return const _NewRecipePlaceholder();
-          },
-        ),
-      );
-    });
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
-}
-
-/// Placeholder that will be replaced by RecipeEditScreen in the actual import.
-class _NewRecipePlaceholder extends StatelessWidget {
-  const _NewRecipePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    // Immediately redirect to the real edit screen.
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

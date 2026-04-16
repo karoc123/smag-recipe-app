@@ -39,6 +39,22 @@ void main() {
       expect(recipe.recipeInstructions, ['Step 1', 'Step 2']);
     });
 
+    test('handles nested instruction list via itemListElement', () {
+      final json = {
+        'name': 'Nested',
+        'recipeInstructions': {
+          '@type': 'HowToSection',
+          'itemListElement': [
+            {'@type': 'HowToStep', 'text': 'Prep ingredients'},
+            {'@type': 'HowToStep', 'text': 'Cook slowly'},
+          ],
+        },
+      };
+
+      final recipe = Recipe.fromJson(json);
+      expect(recipe.recipeInstructions, ['Prep ingredients', 'Cook slowly']);
+    });
+
     test('handles null and missing fields gracefully', () {
       final recipe = Recipe.fromJson({});
       expect(recipe.name, '');

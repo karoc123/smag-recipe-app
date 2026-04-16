@@ -61,9 +61,7 @@ class RecipeProvider extends ChangeNotifier {
 
   Future<Recipe> saveRecipe(Recipe recipe) async {
     final now = DateTime.now().toUtc().toIso8601String();
-    final updated = recipe.copyWith(
-      dateModified: now,
-    );
+    final updated = recipe.copyWith(dateModified: now);
 
     // Determine sync status: if it has a remoteId, mark as pending upload.
     final status = updated.remoteId != null
@@ -76,6 +74,10 @@ class RecipeProvider extends ChangeNotifier {
   }
 
   Future<void> deleteRecipe(int localId) async {
+    final recipe = await _db.getByLocalId(localId);
+    if (recipe?.remoteId != null) {
+      await _db.queuePendingDeletion(recipe!.remoteId!);
+    }
     await _db.removeRecipeFromGrid(localId);
     await _db.deleteRecipe(localId);
     await _refreshState();

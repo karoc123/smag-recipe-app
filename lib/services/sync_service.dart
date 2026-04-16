@@ -37,6 +37,19 @@ class SyncService {
     int conflicts = 0;
     int deleted = 0;
 
+    // 0. Execute deferred remote deletions.
+    final pendingDeletes = await _db.getPendingDeletions();
+    for (final remoteId in pendingDeletes) {
+      try {
+        await _api.deleteRecipe(remoteId);
+      } catch (_) {
+        // Keep it queued for the next sync attempt.
+        continue;
+      }
+      await _db.clearPendingDeletion(remoteId);
+      deleted++;
+    }
+
     // 1. Remote stubs
     final remoteStubs = await _api.getRecipes();
     final remoteIds = <int>{};
@@ -137,6 +150,11 @@ class SyncService {
   /// Returns the new remote id.
   Future<int> pushRecipe(Recipe recipe) async {
     return _api.createRecipe(recipe);
+  }
+
+  /// Let Nextcloud import a recipe URL server-side via Cookbook import endpoint.
+  Future<int> importFromUrl(String url) async {
+    return _api.importFromUrl(url);
   }
 
   // ---------------------------------------------------------------------------

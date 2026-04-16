@@ -452,6 +452,24 @@ abstract class AppLocalizations {
   /// **'Shopping List'**
   String get shoppingList;
 
+  /// No description provided for @clearGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Grid'**
+  String get clearGrid;
+
+  /// No description provided for @clearGridConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to clear the entire grid?'**
+  String get clearGridConfirm;
+
+  /// No description provided for @sourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get sourceLabel;
+
   /// No description provided for @conflictTitle.
   ///
   /// In en, this message translates to:

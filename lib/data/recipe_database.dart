@@ -24,7 +24,7 @@ class RecipeDatabase {
     final path = p.join(dir.path, 'smag_recipes.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE recipes (
@@ -57,6 +57,21 @@ class RecipeDatabase {
         // Initialize 7 grid slots.
         for (var i = 0; i < 7; i++) {
           await db.insert('grid_slots', {'position': i, 'recipe_id': null});
+        }
+
+        await db.execute('''
+          CREATE TABLE pending_deletions (
+            remote_id INTEGER PRIMARY KEY
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS pending_deletions (
+              remote_id INTEGER PRIMARY KEY
+            )
+          ''');
         }
       },
     );
@@ -139,6 +154,31 @@ class RecipeDatabase {
   Future<void> deleteRecipe(int localId) async {
     final db = await database;
     await db.delete('recipes', where: 'local_id = ?', whereArgs: [localId]);
+  }
+
+  /// Queue a remote recipe id for deletion during the next sync run.
+  Future<void> queuePendingDeletion(int remoteId) async {
+    final db = await database;
+    await db.insert('pending_deletions', {
+      'remote_id': remoteId,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Returns all remote ids waiting for deletion on the server.
+  Future<List<int>> getPendingDeletions() async {
+    final db = await database;
+    final rows = await db.query('pending_deletions', columns: ['remote_id']);
+    return rows.map((r) => r['remote_id'] as int).toList();
+  }
+
+  /// Remove a remote id from pending deletions after successful sync delete.
+  Future<void> clearPendingDeletion(int remoteId) async {
+    final db = await database;
+    await db.delete(
+      'pending_deletions',
+      where: 'remote_id = ?',
+      whereArgs: [remoteId],
+    );
   }
 
   Future<List<Recipe>> search(String query) async {

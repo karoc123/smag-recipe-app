@@ -36,7 +36,7 @@ class _GridScreenState extends State<GridScreen> {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () => _clearAllSlots(context),
-            tooltip: l10n.deleteRecipeConfirm,
+            tooltip: l10n.clearGrid,
           ),
         ],
       ),
@@ -54,7 +54,7 @@ class _GridScreenState extends State<GridScreen> {
 
     // Aggregate all ingredients from filled slots
     final allIngredients = <String>[];
-    for (int i = 0; i < grid.slotCount; i++) {
+    for (int i = 0; i < grid.visibleSlotCount; i++) {
       if (grid.isFilled(i)) {
         final recipe = await grid.recipeAt(i);
         if (recipe != null) {
@@ -122,8 +122,8 @@ class _GridScreenState extends State<GridScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.deleteRecipe),
-        content: Text(l10n.deleteRecipeConfirm),
+        title: Text(l10n.clearGrid),
+        content: Text(l10n.clearGridConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -156,6 +156,7 @@ class _GridBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grid = context.watch<GridProvider>();
+    final visibleSlotCount = grid.visibleSlotCount;
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -166,10 +167,11 @@ class _GridBody extends StatelessWidget {
           crossAxisSpacing: 12,
           childAspectRatio: 1.0,
         ),
-        itemCount: grid.slotCount + (isDragging ? 1 : 0),
+        itemCount: visibleSlotCount,
         itemBuilder: (context, index) {
-          if (isDragging && index == grid.slotCount) {
-            return _DeleteSlot(onDragStart: onDragStart, onDragEnd: onDragEnd);
+          // While dragging, replace the trailing "+" tile with a delete tile.
+          if (isDragging && index == visibleSlotCount - 1) {
+            return _DeleteSlot(onDragEnd: onDragEnd);
           }
           return _GridSlot(
             index: index,
@@ -273,10 +275,9 @@ class _EmptySlot extends StatelessWidget {
 
 /// Delete target tile that appears during drag.
 class _DeleteSlot extends StatelessWidget {
-  final VoidCallback onDragStart;
   final VoidCallback onDragEnd;
 
-  const _DeleteSlot({required this.onDragStart, required this.onDragEnd});
+  const _DeleteSlot({required this.onDragEnd});
 
   @override
   Widget build(BuildContext context) {
@@ -355,7 +356,6 @@ class _FilledSlot extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => _viewRecipe(context),
-              onLongPress: () => _showRemoveOption(context),
               child: _RecipeTileContent(recipe: recipe),
             ),
           );
@@ -368,25 +368,6 @@ class _FilledSlot extends StatelessWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => RecipeViewScreen(recipe: recipe)));
-  }
-
-  void _showRemoveOption(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: ListTile(
-            leading: const Icon(Icons.delete),
-            title: Text(AppLocalizations.of(context)!.deleteRecipe),
-            onTap: () {
-              Navigator.pop(context);
-              context.read<GridProvider>().clear(index);
-            },
-          ),
-        ),
-      ),
-    );
   }
 }
 

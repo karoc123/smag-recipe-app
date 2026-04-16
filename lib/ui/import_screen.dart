@@ -14,7 +14,9 @@ import 'recipe_edit_screen.dart';
 /// After parsing, the user chooses "Import Locally" or "Send to Nextcloud".
 /// When sending to Nextcloud, a sync is triggered immediately after.
 class ImportScreen extends StatelessWidget {
-  const ImportScreen({super.key});
+  final String? initialUrl;
+
+  const ImportScreen({super.key, this.initialUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +36,12 @@ class ImportScreen extends StatelessWidget {
               ],
             ),
           ),
-          body: const TabBarView(children: [_UrlImportTab(), _TextImportTab()]),
+          body: TabBarView(
+            children: [
+              _UrlImportTab(initialUrl: initialUrl),
+              const _TextImportTab(),
+            ],
+          ),
         ),
       ),
     );
@@ -44,7 +51,9 @@ class ImportScreen extends StatelessWidget {
 // ─────────────────────── URL Import Tab ──────────────────────────
 
 class _UrlImportTab extends StatefulWidget {
-  const _UrlImportTab();
+  final String? initialUrl;
+
+  const _UrlImportTab({this.initialUrl});
 
   @override
   State<_UrlImportTab> createState() => _UrlImportTabState();
@@ -55,6 +64,14 @@ class _UrlImportTabState extends State<_UrlImportTab> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.initialUrl != null && widget.initialUrl!.isNotEmpty) {
+      _urlCtrl.text = widget.initialUrl!;
+    }
+  }
+
+  @override
   void dispose() {
     _urlCtrl.dispose();
     super.dispose();
@@ -63,11 +80,13 @@ class _UrlImportTabState extends State<_UrlImportTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return SafeArea(
       bottom: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + insets + safeBottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -109,6 +128,14 @@ class _UrlImportTabState extends State<_UrlImportTab> {
       return;
     }
 
+    final choice = await _chooseUrlImportTarget(url);
+    if (choice == null || !mounted) return;
+
+    if (choice == _ImportChoice.nextcloud) {
+      await _sendToNextcloud(context, const Recipe(), sourceUrl: url);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       final result = await context.read<RecipeProvider>().importFromUrl(url);
@@ -126,12 +153,42 @@ class _UrlImportTabState extends State<_UrlImportTab> {
           : result.recipe;
 
       if (!mounted) return;
-      _showImportChoice(recipe);
+      final saved = await Navigator.of(context).push<Recipe>(
+        MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: recipe)),
+      );
+      if (saved != null && mounted) {
+        context.read<RecipeProvider>().loadRecipes();
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (mounted) _showError(e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<_ImportChoice?> _chooseUrlImportTarget(String url) async {
+    final l10n = AppLocalizations.of(context)!;
+    final isLinked = context.read<SettingsProvider>().isLinked;
+
+    return showDialog<_ImportChoice>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.importTitle),
+        content: Text(url),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _ImportChoice.local),
+            child: Text(l10n.importLocally),
+          ),
+          if (isLinked)
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, _ImportChoice.nextcloud),
+              child: Text(l10n.sendToNextcloud),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<String?> _pickImage(List<String> candidates) async {
@@ -189,10 +246,6 @@ class _UrlImportTabState extends State<_UrlImportTab> {
     );
   }
 
-  void _showImportChoice(Recipe recipe) {
-    _openImportChoiceDialog(context, recipe);
-  }
-
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -219,11 +272,13 @@ class _TextImportTabState extends State<_TextImportTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return SafeArea(
       bottom: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + insets + safeBottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -292,8 +347,9 @@ class _TextImportTabState extends State<_TextImportTab> {
 /// Shows a dialog letting the user choose "Import Locally" or "Send to Nextcloud".
 Future<void> _openImportChoiceDialog(
   BuildContext context,
-  Recipe recipe,
-) async {
+  Recipe recipe, {
+  String? sourceUrl,
+}) async {
   final l10n = AppLocalizations.of(context)!;
   final settings = context.read<SettingsProvider>();
   final isLinked = settings.isLinked;
@@ -322,7 +378,7 @@ Future<void> _openImportChoiceDialog(
   if (choice == null || !context.mounted) return;
 
   if (choice == _ImportChoice.nextcloud) {
-    await _sendToNextcloud(context, recipe);
+    await _sendToNextcloud(context, recipe, sourceUrl: sourceUrl);
   } else {
     // Open editor for local import.
     final saved = await Navigator.of(context).push<Recipe>(
@@ -335,7 +391,11 @@ Future<void> _openImportChoiceDialog(
   }
 }
 
-Future<void> _sendToNextcloud(BuildContext context, Recipe recipe) async {
+Future<void> _sendToNextcloud(
+  BuildContext context,
+  Recipe recipe, {
+  String? sourceUrl,
+}) async {
   final l10n = AppLocalizations.of(context)!;
   final syncService = context.read<SyncService>();
   final settings = context.read<SettingsProvider>();
@@ -343,8 +403,13 @@ Future<void> _sendToNextcloud(BuildContext context, Recipe recipe) async {
 
   try {
     settings.setSyncing(true);
-    // Push to server.
-    await syncService.pushRecipe(recipe);
+    if (sourceUrl != null && sourceUrl.isNotEmpty) {
+      // Let Nextcloud Cookbook import the URL server-side.
+      await syncService.importFromUrl(sourceUrl);
+    } else {
+      // Fallback for manual text/JSON imports.
+      await syncService.pushRecipe(recipe);
+    }
     // Sync to pull it back locally.
     await syncService.sync();
     await recipeProvider.loadRecipes();

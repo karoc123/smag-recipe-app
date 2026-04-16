@@ -4,7 +4,7 @@ import '../services/config_service.dart';
 import '../domain/recipe.dart';
 import '../data/recipe_database.dart';
 
-/// State holder for the 7-slot weekly planning grid.
+/// State holder for the dynamic weekly planning grid.
 class GridProvider extends ChangeNotifier {
   final ConfigService _config;
   final RecipeDatabase _db;
@@ -13,7 +13,22 @@ class GridProvider extends ChangeNotifier {
 
   GridProvider(this._config, this._db);
 
-  int get slotCount => ConfigService.slotCount;
+  /// Highest filled slot index, or -1 if grid is empty.
+  int get _lastFilledIndex {
+    var max = -1;
+    for (final entry in _slots.entries) {
+      if (entry.value != null && entry.key > max) {
+        max = entry.key;
+      }
+    }
+    return max;
+  }
+
+  /// Number of visible slots: all filled slots plus exactly one trailing empty.
+  int get visibleSlotCount {
+    final count = _lastFilledIndex + 2;
+    return count < 1 ? 1 : count;
+  }
 
   /// Load slot assignments from the database.
   Future<void> load() async {
@@ -43,15 +58,17 @@ class GridProvider extends ChangeNotifier {
 
   /// Clear all slots.
   Future<void> clearAll() async {
-    for (int i = 0; i < slotCount; i++) {
-      await _config.clearSlot(i);
-      _slots[i] = null;
+    final keys = _slots.keys.toList();
+    for (final k in keys) {
+      await _config.clearSlot(k);
+      _slots[k] = null;
     }
     notifyListeners();
   }
 
   /// Swap two slots (for drag-and-drop).
   Future<void> swap(int from, int to) async {
+    if (from == to) return;
     await _config.swapSlots(from, to);
     final tmp = _slots[from];
     _slots[from] = _slots[to];

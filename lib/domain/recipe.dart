@@ -174,7 +174,28 @@ class Recipe {
 
   static List<String> _strList(dynamic v) {
     if (v == null) return [];
-    if (v is List) return v.map((e) => e.toString()).toList();
+    if (v is List) {
+      return v
+          .map((e) {
+            if (e is Map) {
+              final text = _str(e['text']);
+              if (text.isNotEmpty) return text;
+              return _str(e['name']);
+            }
+            return e.toString();
+          })
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (v is Map) {
+      // schema.org can nest list items in itemListElement.
+      final nested = v['itemListElement'];
+      if (nested != null) return _strList(nested);
+      final text = _str(v['text']);
+      if (text.isNotEmpty) return [text];
+      final name = _str(v['name']);
+      if (name.isNotEmpty) return [name];
+    }
     if (v is String) return v.isEmpty ? [] : [v];
     return [];
   }
@@ -184,10 +205,30 @@ class Recipe {
   static List<String> _instructionsList(dynamic v) {
     if (v == null) return [];
     if (v is List) {
-      return v.map((e) {
-        if (e is Map) return _str(e['text']);
-        return e.toString();
-      }).toList();
+      return v
+          .expand((e) {
+            if (e is Map) {
+              final direct = _str(e['text']);
+              if (direct.isNotEmpty) return [direct];
+
+              final name = _str(e['name']);
+              if (name.isNotEmpty) return [name];
+
+              final nested = e['itemListElement'];
+              if (nested != null) return _instructionsList(nested);
+              return <String>[];
+            }
+            final s = e.toString();
+            return s.isEmpty ? <String>[] : [s];
+          })
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (v is Map) {
+      final direct = _str(v['text']);
+      if (direct.isNotEmpty) return [direct];
+      final nested = v['itemListElement'];
+      if (nested != null) return _instructionsList(nested);
     }
     if (v is String) return v.isEmpty ? [] : [v];
     return [];

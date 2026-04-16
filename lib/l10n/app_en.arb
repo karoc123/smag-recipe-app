@@ -68,6 +68,9 @@
   "philosophyBody": "SMAG is Free and Open Source Software, built as a counter-movement to noisy, ad-filled cooking apps.\n\nYour recipes are yours. No accounts, no tracking, no cloud dependency. When you choose to sync via Nextcloud, your data stays on infrastructure you control.",
 
   "shoppingList": "Shopping List",
+  "clearGrid": "Clear Grid",
+  "clearGridConfirm": "Do you want to clear the entire grid?",
+  "sourceLabel": "Source",
 
   "conflictTitle": "Sync Conflict",
   "conflictMessage": "This recipe was changed both locally and on the server. Which version do you want to keep?",

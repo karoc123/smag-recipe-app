@@ -67,6 +67,9 @@
   "philosophyBody": "SMAG ist freie und quelloffene Software – entwickelt als Gegenbewegung zu lauten, werbeüberladenen Koch-Apps.\n\nDeine Rezepte gehören dir. Keine Konten, kein Tracking, keine Cloud-Abhängigkeit. Wenn du über Nextcloud synchronisierst, bleiben deine Daten auf Infrastruktur, die du kontrollierst.",
 
   "shoppingList": "Einkaufsliste",
+  "clearGrid": "Grid leeren",
+  "clearGridConfirm": "Möchtest du das gesamte Grid leeren?",
+  "sourceLabel": "Quelle",
 
   "conflictTitle": "Synchronisierungskonflikt",
   "conflictMessage": "Dieses Rezept wurde lokal und auf dem Server geändert. Welche Version möchtest du behalten?",

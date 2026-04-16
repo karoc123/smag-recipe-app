@@ -81,6 +81,26 @@ void main() {
       expect(recipe.name, 'Soup');
       expect(recipe.recipeIngredient, ['Water', 'Salt']);
     });
+
+    test('extracts instructions from recipeInstructions container text', () {
+      const html = '''
+<html>
+  <head><title>Tomato Soup</title></head>
+  <body>
+    <div itemprop="recipeInstructions">
+      <p>Chop tomatoes.</p>
+      <p>Simmer for 20 minutes.</p>
+    </div>
+  </body>
+</html>
+''';
+
+      final recipe = parser.parseHtml(html);
+      expect(recipe.recipeInstructions, [
+        'Chop tomatoes.',
+        'Simmer for 20 minutes.',
+      ]);
+    });
   });
 
   group('parsePlainText', () {

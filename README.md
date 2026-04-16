@@ -20,8 +20,8 @@ This project follows one rule: _Does this feature respect focus, or demand atten
 
 ## Core Experience
 
-1. **Recipe Library** — category-grouped list with search, swipe between recipes
-2. **Weekly Planner** — 7-slot drag-and-drop grid for meal planning
+1. **Recipe Library** — category-first navigation, thumbnail list, swipe between recipes
+2. **Weekly Planner** — dynamic drag-and-drop grid with exactly one trailing `+` tile
 3. **Import** — from URL (web scraping + JSON-LD) or pasted text/JSON
 4. **Nextcloud Sync** — bidirectional sync with conflict resolution via the Nextcloud Cookbook Plugin API
 
@@ -43,11 +43,16 @@ Recipes are stored locally in SQLite using the **Nextcloud Cookbook JSON schema*
 
 ## Import Workflow
 
-**From URL:** extracts structured data via JSON-LD or heuristic HTML scraping. Detects up to 5 image candidates.
+**From URL:**
+
+- **Import Locally:** extracts structured data via JSON-LD / HTML heuristics and lets you choose an image.
+- **Send to Nextcloud:** uses Cookbook server-side import endpoint (`POST /apps/cookbook/api/v1/import`), so the server fetches and parses the URL.
 
 **From Text:** paste recipe text (markdown-style) or strict JSON. Use the _Copy Prompt_ button to generate an AI-ready prompt for JSON output.
 
 After parsing, choose: **Import Locally** or **Send to Nextcloud** (pushes to Cookbook API, then syncs).
+
+Browser sharing is supported: choose **Share** on a URL and select SMAG to open the import flow with the URL pre-filled.
 
 ## Nextcloud Integration
 
@@ -56,6 +61,7 @@ SMAG authenticates via the [Nextcloud Android SSO](https://github.com/nextcloud/
 - Connect/disconnect in **Settings → Sync Management**
 - Manual sync trigger (no background sync)
 - Conflict resolution: side-by-side choice of local vs. server version
+- Local delete of synced recipes is queued and executed remotely on the **next sync**
 
 ## Quick Start
 
