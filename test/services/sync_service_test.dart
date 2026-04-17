@@ -12,14 +12,20 @@ import 'package:smag/services/sync_service.dart';
 class _FakeRecipeDatabase extends RecipeDatabase {
   final Map<int, Recipe> _byLocalId = {};
   final Map<int, SyncStatus> _statuses = {};
+  final Map<int, String> _remoteDateModified = {};
   int _nextId = 1;
 
   SyncStatus? statusFor(int localId) => _statuses[localId];
 
-  void seed(Recipe recipe, SyncStatus status) {
+  void seed(
+    Recipe recipe,
+    SyncStatus status, {
+    String remoteDateModified = '',
+  }) {
     final localId = recipe.localId ?? _nextId++;
     _byLocalId[localId] = recipe.copyWith(localId: localId);
     _statuses[localId] = status;
+    _remoteDateModified[localId] = remoteDateModified;
   }
 
   @override
@@ -45,7 +51,13 @@ class _FakeRecipeDatabase extends RecipeDatabase {
     final localId = recipe.localId ?? _nextId++;
     final saved = recipe.copyWith(localId: localId);
     _byLocalId[localId] = saved;
-    _statuses[localId] = syncStatus ?? SyncStatus.localOnly;
+    final status = syncStatus ?? SyncStatus.localOnly;
+    _statuses[localId] = status;
+    if (status == SyncStatus.synced) {
+      _remoteDateModified[localId] = saved.dateModified;
+    } else {
+      _remoteDateModified.putIfAbsent(localId, () => '');
+    }
     return saved;
   }
 
@@ -56,6 +68,7 @@ class _FakeRecipeDatabase extends RecipeDatabase {
   Future<void> deleteRecipe(int localId) async {
     _byLocalId.remove(localId);
     _statuses.remove(localId);
+    _remoteDateModified.remove(localId);
   }
 
   @override
@@ -74,11 +87,24 @@ class _FakeRecipeDatabase extends RecipeDatabase {
     String? remoteDateModified,
   }) async {
     _statuses[localId] = status;
+    if (remoteDateModified != null) {
+      _remoteDateModified[localId] = remoteDateModified;
+    }
   }
 
   @override
   Future<bool> hasSyncStatus(int localId, SyncStatus status) async {
     return _statuses[localId] == status;
+  }
+
+  @override
+  Future<bool> hasRemoteVersionChanged(
+    int localId,
+    String remoteDateModified,
+  ) async {
+    final previous = _remoteDateModified[localId] ?? '';
+    if (previous.isEmpty) return true;
+    return previous != remoteDateModified;
   }
 }
 
@@ -193,6 +219,7 @@ void main() {
             dateModified: 'local-change',
           ),
           SyncStatus.pendingUpload,
+          remoteDateModified: 'remote-base',
         );
         final gateway = _FakeRemoteGateway()
           ..stubs = const [
@@ -215,6 +242,136 @@ void main() {
 
         expect(db.statusFor(1), SyncStatus.conflict);
         expect(result.conflicts, 1);
+      },
+    );
+
+    test(
+      'does not mark conflict when remote is unchanged and local recipe is pending upload',
+      () async {
+        final db = _FakeRecipeDatabase();
+        db.seed(
+          const Recipe(
+            localId: 1,
+            remoteId: 11,
+            name: 'Pasta',
+            dateModified: 'local-change',
+          ),
+          SyncStatus.pendingUpload,
+          remoteDateModified: 'remote-base',
+        );
+
+        final gateway = _FakeRemoteGateway()
+          ..stubs = const [
+            RecipeStub(
+              id: 11,
+              name: 'Pasta',
+              category: 'Dinner',
+              dateModified: 'remote-base',
+            ),
+          ]
+          ..recipes[11] = const Recipe(
+            remoteId: 11,
+            name: 'Pasta',
+            dateModified: 'remote-base',
+          );
+
+        final imageCache = _FakeRecipeImageCache();
+        final syncService = SyncService(db, gateway, imageCache);
+
+        final result = await syncService.sync();
+
+        expect(result.conflicts, 0);
+        expect(result.pushed, 1);
+        expect(gateway.updatedRecipe?.remoteId, 11);
+        expect(db.statusFor(1), SyncStatus.synced);
+      },
+    );
+
+    test('keeps existing conflicts unresolved across sync runs', () async {
+      final db = _FakeRecipeDatabase();
+      db.seed(
+        const Recipe(
+          localId: 1,
+          remoteId: 12,
+          name: 'Soup',
+          dateModified: 'local-conflict-version',
+        ),
+        SyncStatus.conflict,
+        remoteDateModified: 'remote-v1',
+      );
+
+      final gateway = _FakeRemoteGateway()
+        ..stubs = const [
+          RecipeStub(
+            id: 12,
+            name: 'Soup',
+            category: 'Dinner',
+            dateModified: 'remote-v1',
+          ),
+        ]
+        ..recipes[12] = const Recipe(
+          remoteId: 12,
+          name: 'Soup server',
+          dateModified: 'remote-v1',
+        );
+
+      final imageCache = _FakeRecipeImageCache();
+      final syncService = SyncService(db, gateway, imageCache);
+
+      final result = await syncService.sync();
+
+      expect(result.conflicts, 1);
+      expect(db.statusFor(1), SyncStatus.conflict);
+      expect(gateway.updatedRecipe, isNull);
+    });
+
+    test(
+      'suppresses conflict when image differs only as local path vs managed server path',
+      () async {
+        final db = _FakeRecipeDatabase();
+        db.seed(
+          const Recipe(
+            localId: 1,
+            remoteId: 13,
+            name: 'Rye Bread',
+            recipeCategory: 'Bakery',
+            image:
+                '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/123.jpg',
+            localImagePath:
+                '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/123.jpg',
+            dateModified: 'local-change',
+          ),
+          SyncStatus.pendingUpload,
+          remoteDateModified: 'remote-v1',
+        );
+
+        final gateway = _FakeRemoteGateway()
+          ..stubs = const [
+            RecipeStub(
+              id: 13,
+              name: 'Rye Bread',
+              category: 'Bakery',
+              dateModified: 'remote-v2',
+            ),
+          ]
+          ..recipes[13] = const Recipe(
+            remoteId: 13,
+            name: 'Rye Bread',
+            recipeCategory: 'Bakery',
+            image: '/.smag-recipe-image-12.jpg',
+            dateModified: 'remote-v2',
+          );
+
+        final imageCache = _FakeRecipeImageCache();
+        final syncService = SyncService(db, gateway, imageCache);
+
+        final result = await syncService.sync();
+
+        expect(result.conflicts, 0);
+        expect(result.pulled, 1);
+        expect(result.pushed, 0);
+        expect(db.statusFor(1), SyncStatus.synced);
+        expect(gateway.updatedRecipe, isNull);
       },
     );
 

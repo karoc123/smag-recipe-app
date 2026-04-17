@@ -139,6 +139,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get syncNow => 'Jetzt synchronisieren';
 
   @override
+  String get syncLogTitle => 'Synchronisierungsprotokoll';
+
+  @override
+  String get syncLogEmpty => 'Noch keine Synchronisierungsereignisse.';
+
+  @override
+  String get syncCanceled =>
+      'Die Synchronisierung wurde vor der vollständigen Konfliktauflösung abgebrochen.';
+
+  @override
   String syncComplete(String details) {
     return 'Synchronisierung abgeschlossen: $details';
   }
@@ -209,6 +219,23 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get conflictMessage =>
       'Dieses Rezept wurde lokal und auf dem Server geändert. Welche Version möchtest du behalten?';
+
+  @override
+  String get conflictFieldDifferences => 'Unterschiedliche Felder';
+
+  @override
+  String get conflictLocalLabel => 'Lokal';
+
+  @override
+  String get conflictServerLabel => 'Server';
+
+  @override
+  String get conflictNoServerData =>
+      'Die Server-Version konnte nicht geladen werden. Du kannst trotzdem eine Seite wählen.';
+
+  @override
+  String get conflictNoFieldDifferences =>
+      'Keine Unterschiede auf Feldebene erkannt.';
 
   @override
   String get keepLocal => 'Lokale Version';

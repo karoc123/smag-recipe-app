@@ -139,6 +139,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncNow => 'Sync Now';
 
   @override
+  String get syncLogTitle => 'Sync Log';
+
+  @override
+  String get syncLogEmpty => 'No sync log entries yet.';
+
+  @override
+  String get syncCanceled =>
+      'Sync was canceled before all conflicts were resolved.';
+
+  @override
   String syncComplete(String details) {
     return 'Sync complete: $details';
   }
@@ -209,6 +219,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get conflictMessage =>
       'This recipe was changed both locally and on the server. Which version do you want to keep?';
+
+  @override
+  String get conflictFieldDifferences => 'Field differences';
+
+  @override
+  String get conflictLocalLabel => 'Local';
+
+  @override
+  String get conflictServerLabel => 'Server';
+
+  @override
+  String get conflictNoServerData =>
+      'Server version could not be loaded. You can still choose a side.';
+
+  @override
+  String get conflictNoFieldDifferences =>
+      'No field-level differences detected.';
 
   @override
   String get keepLocal => 'Keep Local';

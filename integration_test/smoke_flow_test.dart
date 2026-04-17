@@ -29,8 +29,10 @@ void main() {
   testWidgets('tap import opens import screen', (tester) async {
     await launchApp(tester);
 
-    // Bottom navigation import button should navigate to ImportScreen.
-    await tester.tap(find.byIcon(Icons.download));
+    // Floating add button -> Import should navigate to ImportScreen.
+    await tester.tap(find.byIcon(Icons.add));
+    await pumpUntilVisible(tester, find.text('Import'));
+    await tester.tap(find.text('Import').last);
     await pumpUntilVisible(tester, find.byType(TabBar));
 
     expect(find.byType(TabBar), findsOneWidget);
@@ -40,7 +42,9 @@ void main() {
   testWidgets('import screen switches to text import tab', (tester) async {
     await launchApp(tester);
 
-    await tester.tap(find.byIcon(Icons.download));
+    await tester.tap(find.byIcon(Icons.add));
+    await pumpUntilVisible(tester, find.text('Import'));
+    await tester.tap(find.text('Import').last);
     await pumpUntilVisible(tester, find.byType(TabBar));
 
     await tester.tap(find.byType(Tab).at(1));
@@ -84,13 +88,15 @@ void main() {
 
   testWidgets('toggle grid view and back', (tester) async {
     await launchApp(tester);
+    expect(find.byType(FloatingActionButton), findsNWidgets(2));
 
-    // Tap the grid toggle icon in the bottom navigation.
+    // Tap the floating grid toggle button.
     await tester.tap(find.byIcon(Icons.grid_view));
     await pumpUntilVisible(tester, find.byIcon(Icons.list));
 
     // After toggling, the icon should switch to the list view icon.
     expect(find.byIcon(Icons.list), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsOneWidget);
 
     // Toggle back.
     await tester.tap(find.byIcon(Icons.list));
@@ -99,17 +105,15 @@ void main() {
     expect(find.byIcon(Icons.grid_view), findsOneWidget);
   });
 
-  testWidgets('FAB opens recipe create screen', (tester) async {
+  testWidgets('add menu opens recipe create screen', (tester) async {
     await launchApp(tester);
 
-    // FAB for adding a new recipe should be visible in list mode.
-    final fab = find.byType(FloatingActionButton);
-    if (fab.evaluate().isNotEmpty) {
-      await tester.tap(fab);
-      await pumpUntilVisible(tester, find.byType(TextFormField));
+    await tester.tap(find.byIcon(Icons.add));
+    await pumpUntilVisible(tester, find.byIcon(Icons.edit_note));
+    await tester.tap(find.byIcon(Icons.edit_note));
+    await pumpUntilVisible(tester, find.byType(TextFormField));
 
-      // Recipe edit screen should have a save button or text fields.
-      expect(find.byType(TextFormField), findsWidgets);
-    }
+    // Recipe edit screen should have a save button or text fields.
+    expect(find.byType(TextFormField), findsWidgets);
   });
 }

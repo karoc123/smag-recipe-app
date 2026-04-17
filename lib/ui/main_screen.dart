@@ -12,12 +12,7 @@ import 'recipe_list_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 
-/// Root navigation shell with three primary actions:
-///   1. View Toggle (List ↔ Grid)
-///   2. Import
-///   3. Settings
-///
-/// Back-button from Grid, Settings, or Import always returns here.
+/// Root navigation shell with top-bar search/settings and floating actions.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -54,19 +49,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     try {
       final url = await intentChannel.invokeMethod<String?>('getInitialUrl');
       if (url != null && url.isNotEmpty && mounted) {
-        _navigateToImportWithUrl(url);
+        await _openImport(initialUrl: url);
       }
     } on PlatformException catch (_) {
       // Intent handling not available or failed
     }
   }
 
-  void _navigateToImportWithUrl(String url) {
-    _navigateTo(context, ImportScreen(initialUrl: url));
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return PopScope(
       // Prevent accidental app exit; let the child handle it.
       canPop: false,
@@ -78,91 +71,113 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(AppLocalizations.of(context)!.appTitle),
+          title: Text(l10n.appTitle),
           automaticallyImplyLeading: false,
           actions: [
             IconButton(
               icon: const Icon(Icons.search),
-              tooltip: AppLocalizations.of(context)!.search,
+              tooltip: l10n.search,
               onPressed: () => _navigateTo(context, const SearchScreen()),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: l10n.settings,
+              onPressed: _openSettings,
             ),
           ],
         ),
         body: _showGrid ? const GridScreen() : const RecipeListScreen(),
-        bottomNavigationBar: _BottomBar(
-          showGrid: _showGrid,
-          onToggleView: () => setState(() => _showGrid = !_showGrid),
-          onImport: () => _navigateTo(context, const ImportScreen()),
-          onSettings: () => _navigateTo(context, const SettingsScreen()),
-        ),
-        floatingActionButton: _showGrid
-            ? null
-            : FloatingActionButton(
-                onPressed: _createRecipe,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        floatingActionButton: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!_showGrid) ...[
+              FloatingActionButton(
+                heroTag: 'fab_add_recipe',
+                tooltip: l10n.newRecipe,
+                onPressed: _openCreateOrImportChoice,
                 child: const Icon(Icons.add),
               ),
+              const SizedBox(width: 12),
+            ],
+            FloatingActionButton(
+              heroTag: 'fab_toggle_grid',
+              tooltip: _showGrid ? l10n.recipes : l10n.grid,
+              onPressed: () => setState(() => _showGrid = !_showGrid),
+              child: Icon(_showGrid ? Icons.list : Icons.grid_view),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _navigateTo(BuildContext context, Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  Future<T?> _navigateTo<T>(BuildContext context, Widget screen) {
+    return Navigator.of(
+      context,
+    ).push<T>(MaterialPageRoute(builder: (_) => screen));
   }
 
-  void _createRecipe() async {
+  Future<void> _openCreateOrImportChoice() async {
+    final l10n = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<_AddAction>(
+      context: context,
+      useSafeArea: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: Text(l10n.newRecipe),
+              onTap: () => Navigator.pop(ctx, _AddAction.newRecipe),
+            ),
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: Text(l10n.importTitle),
+              onTap: () => Navigator.pop(ctx, _AddAction.importRecipe),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case _AddAction.newRecipe:
+        await _createRecipe();
+        break;
+      case _AddAction.importRecipe:
+        await _openImport();
+        break;
+    }
+  }
+
+  Future<void> _openImport({String? initialUrl}) async {
+    _ensureRecipeView();
+    await _navigateTo(context, ImportScreen(initialUrl: initialUrl));
+  }
+
+  Future<void> _openSettings() async {
+    _ensureRecipeView();
+    await _navigateTo(context, const SettingsScreen());
+  }
+
+  void _ensureRecipeView() {
+    if (_showGrid) {
+      setState(() => _showGrid = false);
+    }
+  }
+
+  Future<void> _createRecipe() async {
+    _ensureRecipeView();
     final result = await Navigator.of(
       context,
     ).push<Recipe>(MaterialPageRoute(builder: (_) => const RecipeEditScreen()));
     if (result != null && mounted) {
-      context.read<RecipeProvider>().loadRecipes();
+      await context.read<RecipeProvider>().loadRecipes();
     }
   }
 }
 
-/// Bottom bar with the three primary navigation buttons.
-class _BottomBar extends StatelessWidget {
-  final bool showGrid;
-  final VoidCallback onToggleView;
-  final VoidCallback onImport;
-  final VoidCallback onSettings;
-
-  const _BottomBar({
-    required this.showGrid,
-    required this.onToggleView,
-    required this.onImport,
-    required this.onSettings,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return BottomNavigationBar(
-      currentIndex: 0,
-      onTap: (i) {
-        switch (i) {
-          case 0:
-            onToggleView();
-          case 1:
-            onImport();
-          case 2:
-            onSettings();
-        }
-      },
-      items: [
-        BottomNavigationBarItem(
-          icon: Icon(showGrid ? Icons.list : Icons.grid_view),
-          label: showGrid ? l10n.recipes : l10n.grid,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.download),
-          label: l10n.importTitle,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.settings),
-          label: l10n.settings,
-        ),
-      ],
-    );
-  }
-}
+enum _AddAction { newRecipe, importRecipe }

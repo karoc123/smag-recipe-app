@@ -3,12 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
-import '../services/sync_service.dart';
-import '../state/recipe_provider.dart';
 import '../state/settings_provider.dart';
-import '../data/recipe_database.dart';
-import 'conflict_dialog.dart';
-import 'error_dialog.dart';
+import 'sync_log_screen.dart';
 
 /// Settings screen with sections for Sync, Theme, Language, and About.
 class SettingsScreen extends StatelessWidget {
@@ -68,7 +64,7 @@ class _SyncSection extends StatelessWidget {
                   )
                 : const Icon(Icons.sync),
             title: Text(l10n.syncNow),
-            onTap: settings.syncing ? null : () => _sync(context),
+            onTap: settings.syncing ? null : () => _openSyncScreen(context),
           ),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -99,8 +95,14 @@ class _SyncSection extends StatelessWidget {
     final success = await settings.linkAccount();
     if (success && context.mounted) {
       // Trigger initial sync.
-      _sync(context);
+      _openSyncScreen(context);
     }
+  }
+
+  Future<void> _openSyncScreen(BuildContext context) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SyncLogScreen()));
   }
 
   Future<void> _disconnect(BuildContext context) async {
@@ -124,52 +126,6 @@ class _SyncSection extends StatelessWidget {
     );
     if (confirmed == true && context.mounted) {
       await context.read<SettingsProvider>().unlinkAccount();
-    }
-  }
-
-  Future<void> _sync(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final settings = context.read<SettingsProvider>();
-    final syncService = context.read<SyncService>();
-    final recipes = context.read<RecipeProvider>();
-
-    settings.setSyncing(true);
-    try {
-      final result = await syncService.sync();
-      await recipes.loadRecipes();
-
-      // Handle conflicts interactively.
-      if (result.conflicts > 0 && context.mounted) {
-        final db = context.read<RecipeDatabase>();
-        final conflicts = await db.getConflicts();
-        for (final recipe in conflicts) {
-          if (!context.mounted) break;
-          final choice = await showDialog<ConflictChoice>(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => ConflictDialog(recipe: recipe),
-          );
-          if (choice == ConflictChoice.cancelSync) break;
-          if (choice == ConflictChoice.skip || choice == null) continue;
-          await syncService.resolveConflict(
-            recipe.localId!,
-            keepLocal: choice == ConflictChoice.keepLocal,
-          );
-        }
-        await recipes.loadRecipes();
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.syncComplete(result.toString()))),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showErrorDialog(context, title: l10n.syncErrorTitle, error: e);
-      }
-    } finally {
-      settings.setSyncing(false);
     }
   }
 }

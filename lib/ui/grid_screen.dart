@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,7 +11,7 @@ import '../state/grid_provider.dart';
 import 'recipe_picker_dialog.dart';
 import 'recipe_view_screen.dart';
 
-/// 7-slot weekly meal planning grid with drag-and-drop and images.
+/// Dynamic meal planning grid with drag-and-drop and images.
 class GridScreen extends StatefulWidget {
   const GridScreen({super.key});
 
@@ -62,6 +64,8 @@ class _GridScreenState extends State<GridScreen> {
         }
       }
     }
+
+    allIngredients.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     if (!context.mounted) return;
 
@@ -380,8 +384,9 @@ class _RecipeTileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final image = recipe.displayImage;
 
-    if (recipe.image.isEmpty) {
+    if (image.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
         child: Center(
@@ -399,13 +404,7 @@ class _RecipeTileContent extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        CachedNetworkImage(
-          imageUrl: recipe.image,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(color: Colors.grey[300]),
-          errorWidget: (context, url, error) =>
-              Container(color: Colors.grey[300]),
-        ),
+        _buildImage(image),
         Container(color: Colors.black.withValues(alpha: 0.4)),
         Padding(
           padding: const EdgeInsets.all(12),
@@ -430,5 +429,24 @@ class _RecipeTileContent extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildImage(String image) {
+    if (image.startsWith('http://') || image.startsWith('https://')) {
+      return CachedNetworkImage(
+        imageUrl: image,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(color: Colors.grey[300]),
+        errorWidget: (context, url, error) =>
+            Container(color: Colors.grey[300]),
+      );
+    }
+
+    final file = File(image);
+    if (file.existsSync()) {
+      return Image.file(file, fit: BoxFit.cover);
+    }
+
+    return Container(color: Colors.grey[300]);
   }
 }

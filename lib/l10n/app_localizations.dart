@@ -356,6 +356,24 @@ abstract class AppLocalizations {
   /// **'Sync Now'**
   String get syncNow;
 
+  /// No description provided for @syncLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Log'**
+  String get syncLogTitle;
+
+  /// No description provided for @syncLogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sync log entries yet.'**
+  String get syncLogEmpty;
+
+  /// No description provided for @syncCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync was canceled before all conflicts were resolved.'**
+  String get syncCanceled;
+
   /// No description provided for @syncComplete.
   ///
   /// In en, this message translates to:
@@ -487,6 +505,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This recipe was changed both locally and on the server. Which version do you want to keep?'**
   String get conflictMessage;
+
+  /// No description provided for @conflictFieldDifferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Field differences'**
+  String get conflictFieldDifferences;
+
+  /// No description provided for @conflictLocalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get conflictLocalLabel;
+
+  /// No description provided for @conflictServerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get conflictServerLabel;
+
+  /// No description provided for @conflictNoServerData.
+  ///
+  /// In en, this message translates to:
+  /// **'Server version could not be loaded. You can still choose a side.'**
+  String get conflictNoServerData;
+
+  /// No description provided for @conflictNoFieldDifferences.
+  ///
+  /// In en, this message translates to:
+  /// **'No field-level differences detected.'**
+  String get conflictNoFieldDifferences;
 
   /// No description provided for @keepLocal.
   ///

@@ -22,13 +22,16 @@ class SyncService {
   /// Run a full sync cycle. Returns a human-readable summary.
   ///
   /// Throws if no account is linked.
-  Future<SyncResult> sync() async {
+  Future<SyncResult> sync({void Function(String entry)? onLog}) async {
     await _remoteGateway.ensureAccountLinked();
+    void log(String message) => onLog?.call(message);
 
     int pulled = 0;
     int pushed = 0;
     int conflicts = 0;
     int deleted = 0;
+
+    log('Sync started.');
 
     // 0. Execute deferred remote deletions.
     final pendingDeletes = await _db.getPendingDeletions();
@@ -37,14 +40,17 @@ class SyncService {
         await _remoteGateway.deleteRecipe(remoteId);
       } catch (_) {
         // Keep it queued for the next sync attempt.
+        log('Delete failed for remote recipe #$remoteId, keeping queue entry.');
         continue;
       }
       await _db.clearPendingDeletion(remoteId);
       deleted++;
+      log('Deleted remote recipe #$remoteId.');
     }
 
     // 1. Remote stubs
     final remoteStubs = await _remoteGateway.getRecipes();
+    log('Fetched ${remoteStubs.length} remote recipe stubs.');
     final remoteIds = <int>{};
 
     // 2. Pull / detect conflicts
@@ -63,30 +69,67 @@ class SyncService {
           syncStatus: SyncStatus.synced,
         );
         pulled++;
+        log('Pulled new remote recipe "${recipe.name}" (#${stub.id}).');
         continue;
       }
 
-      // Exists locally — check for conflicts.
-      final localModified =
-          local.dateModified != stub.dateModified &&
-          await _db.hasSyncStatus(local.localId!, SyncStatus.pendingUpload);
+      final localId = local.localId;
+      if (localId == null) {
+        continue;
+      }
 
-      if (localModified) {
-        // Both sides changed.
-        await _db.setSyncStatus(local.localId!, SyncStatus.conflict);
+      final hasPendingUpload = await _db.hasSyncStatus(
+        localId,
+        SyncStatus.pendingUpload,
+      );
+      final hasConflict = await _db.hasSyncStatus(localId, SyncStatus.conflict);
+      final remoteChanged = await _db.hasRemoteVersionChanged(
+        localId,
+        stub.dateModified,
+      );
+
+      if (hasConflict) {
+        // Preserve unresolved conflicts until the user explicitly resolves them.
         conflicts++;
-      } else if (local.dateModified != stub.dateModified) {
+        log('Conflict still pending for "${local.name}" (#${stub.id}).');
+      } else if (hasPendingUpload && remoteChanged) {
+        final remoteRecipe = await _remoteGateway.getRecipe(stub.id);
+
+        if (_isImagePathAliasOnlyDifference(local, remoteRecipe)) {
+          final localImagePath = await _downloadImage(stub.id);
+          await _db.upsertRecipe(
+            remoteRecipe.copyWith(
+              localId: localId,
+              localImagePath: remoteRecipe.image.isEmpty
+                  ? ''
+                  : (localImagePath ?? local.localImagePath),
+            ),
+            syncStatus: SyncStatus.synced,
+          );
+          pulled++;
+          log(
+            'Suppressed image-path-only conflict for "${local.name}" (#${stub.id}).',
+          );
+          continue;
+        }
+
+        // Both sides changed.
+        await _db.setSyncStatus(localId, SyncStatus.conflict);
+        conflicts++;
+        log('Detected conflict for "${local.name}" (#${stub.id}).');
+      } else if (remoteChanged) {
         // Only remote changed → pull.
         final recipe = await _remoteGateway.getRecipe(stub.id);
         final localImagePath = await _downloadImage(stub.id);
         await _db.upsertRecipe(
           recipe.copyWith(
-            localId: local.localId,
+            localId: localId,
             localImagePath: recipe.image.isEmpty ? '' : (localImagePath ?? ''),
           ),
           syncStatus: SyncStatus.synced,
         );
         pulled++;
+        log('Pulled updated remote recipe "${recipe.name}" (#${stub.id}).');
       }
       // else: in sync, nothing to do.
     }
@@ -98,6 +141,7 @@ class SyncService {
         // Recipe was deleted on the server → remove locally.
         await _db.deleteRecipe(local.localId!);
         deleted++;
+        log('Deleted local recipe "${local.name}" (missing remotely).');
       }
     }
 
@@ -112,13 +156,19 @@ class SyncService {
           recipe.copyWith(remoteId: remoteId),
           remoteId: remoteId,
         );
+        log('Pushed new local recipe "${recipe.name}" to server.');
       } else {
         // Modified locally → update on server.
         await _remoteGateway.updateRecipe(uploadReady);
         await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
+        log('Updated remote recipe "${recipe.name}" (#${recipe.remoteId}).');
       }
       pushed++;
     }
+
+    log(
+      'Sync finished. Pulled=$pulled, Pushed=$pushed, Conflicts=$conflicts, Deleted=$deleted.',
+    );
 
     return SyncResult(
       pulled: pulled,
@@ -162,6 +212,15 @@ class SyncService {
   /// Let Nextcloud import a recipe URL server-side via Cookbook import endpoint.
   Future<int> importFromUrl(String url) async {
     return _remoteGateway.importFromUrl(url);
+  }
+
+  /// Fetch a remote recipe for conflict inspection UI.
+  Future<Recipe?> fetchRemoteRecipe(int remoteId) async {
+    try {
+      return await _remoteGateway.getRecipe(remoteId);
+    } catch (_) {
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -216,6 +275,60 @@ class SyncService {
       return recipe.image;
     }
     return null;
+  }
+
+  bool _isImagePathAliasOnlyDifference(Recipe local, Recipe remote) {
+    if (!_matchesIgnoringImage(local, remote)) {
+      return false;
+    }
+
+    final localImage = local.image.trim();
+    final remoteImage = remote.image.trim();
+    if (localImage == remoteImage) {
+      return false;
+    }
+
+    return _isLocalImageFilePath(localImage, local.localImagePath) &&
+        _isRemoteManagedImagePath(remoteImage);
+  }
+
+  bool _matchesIgnoringImage(Recipe local, Recipe remote) {
+    return _same(local.name, remote.name) &&
+        _same(local.description, remote.description) &&
+        _same(local.url, remote.url) &&
+        _same(local.prepTime, remote.prepTime) &&
+        _same(local.cookTime, remote.cookTime) &&
+        _same(local.totalTime, remote.totalTime) &&
+        _same(local.recipeCategory, remote.recipeCategory) &&
+        _same(local.keywords, remote.keywords) &&
+        _same(local.recipeYield, remote.recipeYield) &&
+        _sameList(local.tool, remote.tool) &&
+        _sameList(local.recipeIngredient, remote.recipeIngredient) &&
+        _sameList(local.recipeInstructions, remote.recipeInstructions);
+  }
+
+  bool _same(String a, String b) => a.trim() == b.trim();
+
+  bool _sameList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!_same(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _isLocalImageFilePath(String image, String localImagePath) {
+    if (image.isEmpty) return false;
+    if (localImagePath.isNotEmpty && image == localImagePath) {
+      return true;
+    }
+    return image.startsWith('/data/') || image.contains('/app_flutter/');
+  }
+
+  bool _isRemoteManagedImagePath(String image) {
+    return image.startsWith('/.smag-recipe-image-');
   }
 }
 

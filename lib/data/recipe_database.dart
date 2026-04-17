@@ -11,7 +11,7 @@ import '../domain/recipe.dart';
 /// Stores the full Nextcloud Cookbook JSON per recipe so round-tripping to the
 /// API is lossless. Indexed columns enable fast list / search queries.
 class RecipeDatabase {
-  static const int gridSlotCount = 7;
+  static const int gridSlotCount = 1;
 
   Database? _db;
 
@@ -120,19 +120,24 @@ class RecipeDatabase {
 
     if (recipe.localId != null) {
       // Update existing.
+      final values = <String, Object?>{
+        'remote_id': recipe.remoteId,
+        'name': recipe.name,
+        'category': recipe.recipeCategory,
+        'json_data': json,
+        'image_path': recipe.localImagePath,
+        'sync_status': status.name,
+        'date_modified': recipe.dateModified.isEmpty
+            ? now
+            : recipe.dateModified,
+      };
+      if (status == SyncStatus.synced) {
+        values['remote_date_modified'] = recipe.dateModified;
+      }
+
       await db.update(
         'recipes',
-        {
-          'remote_id': recipe.remoteId,
-          'name': recipe.name,
-          'category': recipe.recipeCategory,
-          'json_data': json,
-          'image_path': recipe.localImagePath,
-          'sync_status': status.name,
-          'date_modified': recipe.dateModified.isEmpty
-              ? now
-              : recipe.dateModified,
-        },
+        values,
         where: 'local_id = ?',
         whereArgs: [recipe.localId],
       );
@@ -148,7 +153,9 @@ class RecipeDatabase {
       'image_path': recipe.localImagePath,
       'sync_status': status.name,
       'date_modified': recipe.dateModified.isEmpty ? now : recipe.dateModified,
-      'remote_date_modified': recipe.dateModified,
+      'remote_date_modified': status == SyncStatus.synced
+          ? recipe.dateModified
+          : '',
     });
     return recipe.copyWith(localId: id);
   }
@@ -252,6 +259,7 @@ class RecipeDatabase {
   /// Returns a map of position → localId (null if slot is empty).
   Future<Map<int, int?>> getGridSlots() async {
     final db = await database;
+    await _normalizeGridSlots(db);
     final rows = await db.query('grid_slots', orderBy: 'position');
     return {for (final r in rows) r['position'] as int: r['recipe_id'] as int?};
   }
@@ -326,6 +334,26 @@ class RecipeDatabase {
     return rows.first['sync_status'] == status.name;
   }
 
+  /// True when the server's `dateModified` has changed since last synced pull.
+  Future<bool> hasRemoteVersionChanged(
+    int localId,
+    String remoteDateModified,
+  ) async {
+    final db = await database;
+    final rows = await db.query(
+      'recipes',
+      columns: ['remote_date_modified'],
+      where: 'local_id = ?',
+      whereArgs: [localId],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return true;
+    final previous = (rows.first['remote_date_modified'] as String?) ?? '';
+    if (previous.isEmpty) return true;
+    return previous != remoteDateModified;
+  }
+
   Recipe _rowToRecipe(Map<String, dynamic> row) {
     final json = jsonDecode(row['json_data'] as String) as Map<String, dynamic>;
     return Recipe.fromJson(json).copyWith(
@@ -338,5 +366,43 @@ class RecipeDatabase {
   Future<void> close() async {
     await _db?.close();
     _db = null;
+  }
+
+  Future<void> _normalizeGridSlots(Database db) async {
+    final rows = await db.query('grid_slots', orderBy: 'position');
+    if (rows.isEmpty) {
+      await db.insert('grid_slots', {
+        'position': 0,
+        'recipe_id': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      return;
+    }
+
+    var maxFilled = -1;
+    final existingPositions = <int>{};
+    for (final row in rows) {
+      final position = row['position'] as int;
+      existingPositions.add(position);
+      if (row['recipe_id'] != null && position > maxFilled) {
+        maxFilled = position;
+      }
+    }
+
+    final maxRequiredPosition = maxFilled < 0 ? 0 : maxFilled + 1;
+
+    for (var i = 0; i <= maxRequiredPosition; i++) {
+      if (!existingPositions.contains(i)) {
+        await db.insert('grid_slots', {
+          'position': i,
+          'recipe_id': null,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    }
+
+    await db.delete(
+      'grid_slots',
+      where: 'position > ? AND recipe_id IS NULL',
+      whereArgs: [maxRequiredPosition],
+    );
   }
 }

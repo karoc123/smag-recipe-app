@@ -21,7 +21,18 @@ This project follows one rule: _Does this feature respect focus, or demand atten
 1. **Recipe Library** — category-first navigation, thumbnail list, swipe between recipes
 2. **Weekly Planner** — dynamic drag-and-drop grid with exactly one trailing `+` tile
 3. **Import** — from URL (web scraping + JSON-LD) or pasted text/JSON
-4. **Nextcloud Sync** — bidirectional sync with conflict resolution via the [Nextcloud Cookbook Plugin API](https://github.com/nextcloud/cookbook)
+4. **Nextcloud Sync** — bidirectional sync with field-level conflict comparison and a copyable sync log via the [Nextcloud Cookbook Plugin API](https://github.com/nextcloud/cookbook)
+
+## Navigation
+
+- App-wide top bar actions: **Search** and **Settings**.
+- Bottom-right floating actions:
+  - **Add (`+`)** in recipe view
+  - **List/Grid Toggle** always visible, positioned directly to the right of `+` in recipe view and in the same position in grid view
+- The **Add (`+`)** action opens a chooser:
+  - **New Recipe**: opens the recipe editor
+  - **Import**: opens the import screen (URL/Text tabs)
+- Import and Settings are opened as dedicated screens and return to the recipe view on back navigation.
 
 ## Import Workflow
 
@@ -35,7 +46,8 @@ This project follows one rule: _Does this feature respect focus, or demand atten
 
 After parsing, choose: **Import Locally** or **Send to Nextcloud** (pushes to Cookbook API, then syncs).
 
-Browser sharing is supported: choose **Share** on a URL and select SMAG to open the import flow with the URL pre-filled.
+URL sharing is supported: choose **Share** on a URL and select SMAG to open the import flow with the URL pre-filled.
+SMAG does not claim generic browser links (`http/https`) as a default handler.
 
 ## Nextcloud Integration
 
@@ -43,8 +55,10 @@ SMAG authenticates via the [Nextcloud Android SSO](https://github.com/nextcloud/
 
 - Connect/disconnect in **Settings → Sync Management**
 - Manual sync trigger (no background sync)
+- Sync runs in a dedicated **Sync Log** screen with a copyable action log
 - Locally selected recipe images are uploaded to your Nextcloud files and referenced from Cookbook during sync
-- Conflict resolution: side-by-side choice of local vs. server version
+- Conflict resolution: local vs. server comparison including differing fields and values
+- Unresolved conflicts remain explicit and are not auto-overwritten on the next sync run
 - Local delete of synced recipes is queued and executed remotely on the **next sync**
 
 ## Quick Start

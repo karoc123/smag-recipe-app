@@ -50,13 +50,6 @@ class MainActivity : FlutterActivity() {
     private fun extractIncomingUrl(intent: Intent?): String? {
         if (intent == null) return null
 
-        if (intent.action == Intent.ACTION_VIEW) {
-            val data = intent.dataString
-            if (data != null && (data.startsWith("http://") || data.startsWith("https://"))) {
-                return data
-            }
-        }
-
         if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
             val matcher = Patterns.WEB_URL.matcher(text)

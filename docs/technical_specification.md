@@ -33,6 +33,7 @@ Recipes follow the Nextcloud Cookbook JSON format:
 ### 3. Core Functional Pillars
 
 - **The Grid:** A dynamic visual dashboard with exactly one trailing empty (`+`) slot. During drag, the trailing slot becomes a delete target.
+  Shopping list aggregation from grid recipes is sorted alphabetically for predictable kitchen use.
 - **The Search:** Global full-text search accessible from a persistent search icon in the top AppBar. Searches all recipes (name, category, ingredients) via SQLite LIKE, independent of any category selection. Opens a dedicated `SearchScreen` overlay.
 - **The Cook-Mode:** Integration of `wakelock` to keep the screen active.
 - **The Import Engine:**
@@ -40,10 +41,15 @@ Recipes follow the Nextcloud Cookbook JSON format:
   - **From Text:** JSON parsing (Nextcloud schema + alternate keys) or markdown-style heuristic parsing.
   - **Nextcloud Push:** Import directly to Nextcloud Cookbook via `POST /api/v1/recipes/import`. A loading dialog blocks the UI until the server responds or an error occurs. The API response is parsed leniently (plain integer, JSON integer, or JSON object with `id` field).
 - **The Sync Engine:**
-  - **Bidirectional** sync comparing `dateModified` timestamps. Locally created recipes (`localOnly`) are automatically pushed to the server during sync when a Nextcloud account is linked.
+  - **Bidirectional** sync with remote baseline tracking (`remote_date_modified`) to distinguish "local-only changes" from true local+remote conflicts.
+  - Locally created recipes (`localOnly`) are automatically pushed to the server during sync when a Nextcloud account is linked.
   - Local image files are uploaded into the user's Nextcloud files via WebDAV before recipe create/update, then the remote recipe is refreshed and its server image is cached locally.
   - Manual trigger only (no background sync).
+  - Sync executes in a dedicated **Sync Log** screen with copy-to-clipboard support.
   - **Conflict resolution dialog** with four options: **Keep Local**, **Keep Server**, **Skip** (leave in conflict state), and **Cancel Sync** (abort remaining conflict resolution).
+  - Conflict dialogs display differing fields and values for **Local** vs **Server** versions.
+  - Conflicts are suppressed when the only discrepancy is a local image file path versus a managed Nextcloud image path.
+  - Unresolved conflicts remain explicit across sync runs and are never auto-overwritten.
   - Pending remote deletions are executed first at sync start.
 
 ### 4. Authentication
@@ -55,17 +61,22 @@ Recipes follow the Nextcloud Cookbook JSON format:
 
 ### 5. Navigation
 
-`AppBar` with app title and global search icon. Three-button `BottomNavigationBar`:
+`AppBar` with app title and persistent actions:
 
-1. **View Toggle** — switches between recipe list (category picker → filtered list) and 7-slot grid
-2. **Import** — URL and text import with Nextcloud push option
-3. **Settings** — sync management, theme, language, about
+1. **Search**
+2. **Settings**
 
-Back button: Grid/Settings/Import always return to the main recipe overview.
+Floating bottom-right actions:
+
+1. **Add (`+`)** — visible in recipe view; opens a chooser for **New Recipe** or **Import**
+2. **View Toggle** — always visible; toggles recipe list and grid, and sits directly right of `+` in recipe view
+
+Back button: Import/Settings return to the recipe overview.
 
 Android share integration:
 
-- `ACTION_SEND` (`text/plain`) and `ACTION_VIEW` (`http`/`https`) route URLs into the import flow.
+- `ACTION_SEND` (`text/plain`) routes shared URLs into the import flow.
+- Generic browser link handling (`ACTION_VIEW` for `http`/`https`) is intentionally not claimed by SMAG.
 - Intents are consumed once and cleared (`setIntent(Intent())`) to prevent re-navigation on app resume.
 
 ### 6. Theming
@@ -93,4 +104,4 @@ Android share integration:
 - A `start_integrationtests.sh` script supports two modes:
   - **Docker mode** (default): Launches a Docker container (`budtmo/docker-android:emulator_14.0`) with an Android emulator. Requires KVM (`/dev/kvm`); the script detects missing KVM and exits with a clear error message. Uses `--device /dev/kvm` passthrough and the `DEVICE` environment variable. Boot timeout is 360 seconds.
   - **Local mode** (`--local`): Runs tests against a connected physical device or host emulator via `adb devices`.
-- Smoke tests cover: import screen navigation, search screen, settings screen, grid view toggle, and FAB → recipe create screen.
+- Smoke tests cover: add-menu import navigation, add-menu recipe creation, search screen, settings screen, and grid view toggle.
