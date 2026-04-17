@@ -9,6 +9,7 @@ import 'grid_screen.dart';
 import 'import_screen.dart';
 import 'recipe_edit_screen.dart';
 import 'recipe_list_screen.dart';
+import 'search_screen.dart';
 import 'settings_screen.dart';
 
 /// Root navigation shell with three primary actions:
@@ -53,7 +54,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     try {
       final url = await intentChannel.invokeMethod<String?>('getInitialUrl');
       if (url != null && url.isNotEmpty && mounted) {
-        // Navigate to import screen with URL pre-filled
         _navigateToImportWithUrl(url);
       }
     } on PlatformException catch (_) {
@@ -77,6 +77,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
       },
       child: Scaffold(
+        appBar: AppBar(
+          title: Text(AppLocalizations.of(context)!.appTitle),
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: AppLocalizations.of(context)!.search,
+              onPressed: () => _navigateTo(context, const SearchScreen()),
+            ),
+          ],
+        ),
         body: _showGrid ? const GridScreen() : const RecipeListScreen(),
         bottomNavigationBar: _BottomBar(
           showGrid: _showGrid,

@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 
 import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
+import '../services/recipe_duration.dart';
 import '../state/recipe_provider.dart';
+import 'recipe_edit_draft.dart';
 
 /// Recipe creation / editing form.
 ///
@@ -25,8 +27,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
   final _imagePicker = ImagePicker();
-  String? _prepDurationIso;
-  String? _cookDurationIso;
+  late final RecipeEditDraft _draft;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _categoryCtrl;
@@ -43,28 +44,18 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   @override
   void initState() {
     super.initState();
-    final r = widget.recipe;
-    _nameCtrl = TextEditingController(text: r?.name ?? '');
-    _categoryCtrl = TextEditingController(text: r?.recipeCategory ?? '');
-    _yieldCtrl = TextEditingController(text: r?.recipeYield ?? '');
-    _prepDurationIso = r?.prepTime;
-    _cookDurationIso = r?.cookTime;
-    _prepTimeCtrl = TextEditingController(
-      text: _durationToDisplay(r?.prepTime ?? ''),
-    );
-    _cookTimeCtrl = TextEditingController(
-      text: _durationToDisplay(r?.cookTime ?? ''),
-    );
-    _descriptionCtrl = TextEditingController(text: r?.description ?? '');
-    _imageCtrl = TextEditingController(text: r?.image ?? '');
-    _urlCtrl = TextEditingController(text: r?.url ?? '');
-    _keywordsCtrl = TextEditingController(text: r?.keywords ?? '');
-    _ingredientsCtrl = TextEditingController(
-      text: r?.recipeIngredient.join('\n') ?? '',
-    );
-    _instructionsCtrl = TextEditingController(
-      text: r?.recipeInstructions.join('\n') ?? '',
-    );
+    _draft = RecipeEditDraft.fromRecipe(widget.recipe);
+    _nameCtrl = TextEditingController(text: _draft.name);
+    _categoryCtrl = TextEditingController(text: _draft.category);
+    _yieldCtrl = TextEditingController(text: _draft.yieldText);
+    _prepTimeCtrl = TextEditingController(text: _draft.prepTimeDisplay);
+    _cookTimeCtrl = TextEditingController(text: _draft.cookTimeDisplay);
+    _descriptionCtrl = TextEditingController(text: _draft.description);
+    _imageCtrl = TextEditingController(text: _draft.image);
+    _urlCtrl = TextEditingController(text: _draft.url);
+    _keywordsCtrl = TextEditingController(text: _draft.keywords);
+    _ingredientsCtrl = TextEditingController(text: _draft.ingredientsText);
+    _instructionsCtrl = TextEditingController(text: _draft.instructionsText);
   }
 
   @override
@@ -145,6 +136,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                         controller: controller,
                         focusNode: focusNode,
                         decoration: InputDecoration(labelText: l10n.category),
+                        onChanged: (value) => _categoryCtrl.text = value,
                       );
                     },
               ),
@@ -218,7 +210,7 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
               // Source URL
               TextFormField(
                 controller: _urlCtrl,
-                decoration: const InputDecoration(labelText: 'Source URL'),
+                decoration: InputDecoration(labelText: l10n.sourceLabel),
               ),
               const SizedBox(height: 12),
 
@@ -296,10 +288,10 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
 
   Future<void> _pickDuration(TextEditingController controller) async {
     final sourceIso = identical(controller, _prepTimeCtrl)
-        ? (_prepDurationIso ?? '')
-        : (_cookDurationIso ?? '');
+        ? _draft.prepTimeIso
+        : _draft.cookTimeIso;
     final initial =
-        _parseDurationToTimeOfDay(sourceIso) ??
+        RecipeDuration.toTimeOfDay(sourceIso) ??
         const TimeOfDay(hour: 0, minute: 0);
     final picked = await showTimePicker(
       context: context,
@@ -312,76 +304,33 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
       },
     );
     if (picked == null) return;
-    final iso = 'P0DT${picked.hour}H${picked.minute}M';
     setState(() {
       if (identical(controller, _prepTimeCtrl)) {
-        _prepDurationIso = iso;
+        _draft.setPrepTime(picked);
+        controller.text = _draft.prepTimeDisplay;
       } else {
-        _cookDurationIso = iso;
+        _draft.setCookTime(picked);
+        controller.text = _draft.cookTimeDisplay;
       }
-      controller.text = _durationToDisplay(iso);
     });
-  }
-
-  TimeOfDay? _parseDurationToTimeOfDay(String value) {
-    if (value.isEmpty) return null;
-    final regex = RegExp(
-      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
-    );
-    final match = regex.firstMatch(value);
-    if (match == null) return null;
-    final days = int.tryParse(match.group(1) ?? '0') ?? 0;
-    final hours = int.tryParse(match.group(2) ?? '0') ?? 0;
-    final minutes = int.tryParse(match.group(3) ?? '0') ?? 0;
-    final normalizedHours = ((days * 24) + hours) % 24;
-    return TimeOfDay(hour: normalizedHours, minute: minutes.clamp(0, 59));
-  }
-
-  String _durationToDisplay(String iso) {
-    if (iso.isEmpty) return '';
-    final regex = RegExp(
-      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
-    );
-    final match = regex.firstMatch(iso);
-    if (match == null) return iso;
-    final days = int.tryParse(match.group(1) ?? '0') ?? 0;
-    final hours = int.tryParse(match.group(2) ?? '0') ?? 0;
-    final minutes = int.tryParse(match.group(3) ?? '0') ?? 0;
-    final parts = <String>[];
-    if (days > 0) parts.add('${days}d');
-    if (hours > 0) parts.add('${hours}h');
-    if (minutes > 0) parts.add('${minutes}min');
-    return parts.isEmpty ? '0min' : parts.join(' ');
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
-    final ingredients = _ingredientsCtrl.text
-        .split('\n')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    final instructions = _instructionsCtrl.text
-        .split('\n')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    _draft
+      ..name = _nameCtrl.text
+      ..category = _categoryCtrl.text
+      ..yieldText = _yieldCtrl.text
+      ..description = _descriptionCtrl.text
+      ..image = _imageCtrl.text
+      ..url = _urlCtrl.text
+      ..keywords = _keywordsCtrl.text
+      ..ingredientsText = _ingredientsCtrl.text
+      ..instructionsText = _instructionsCtrl.text;
 
-    final recipe = (widget.recipe ?? const Recipe()).copyWith(
-      name: _nameCtrl.text.trim(),
-      recipeCategory: _categoryCtrl.text.trim(),
-      recipeYield: _yieldCtrl.text.trim(),
-      prepTime: _prepDurationIso ?? '',
-      cookTime: _cookDurationIso ?? '',
-      image: _imageCtrl.text.trim(),
-      url: _urlCtrl.text.trim(),
-      keywords: _keywordsCtrl.text.trim(),
-      description: _descriptionCtrl.text.trim(),
-      recipeIngredient: ingredients,
-      recipeInstructions: instructions,
-    );
+    final recipe = _draft.toRecipe(widget.recipe ?? const Recipe());
 
     try {
       final saved = await context.read<RecipeProvider>().saveRecipe(recipe);

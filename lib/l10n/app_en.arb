@@ -1,9 +1,10 @@
 {
   "@@locale": "en",
-  "appTitle": "SMAG",
+  "appTitle": "Simple Meal Archive Gallery",
   "recipes": "Recipes",
   "grid": "Grid",
   "search": "Search",
+  "allRecipes": "All Recipes",
   "noRecipes": "No recipes yet. Import or create one!",
   "newRecipe": "New Recipe",
   "editRecipe": "Edit Recipe",
@@ -75,5 +76,19 @@
   "conflictTitle": "Sync Conflict",
   "conflictMessage": "This recipe was changed both locally and on the server. Which version do you want to keep?",
   "keepLocal": "Keep Local",
-  "keepServer": "Keep Server"
+  "keepServer": "Keep Server",
+  "cancelSync": "Cancel Sync",
+  "skipConflict": "Skip",
+  "importing": "Importing\u2026",
+
+  "errorTitle": "Error",
+  "syncErrorTitle": "Sync Error",
+  "copyError": "Copy Error",
+  "errorCopied": "Error details copied to clipboard",
+  "error409RecipeExists": "A recipe with this name already exists on the server. Please rename the recipe and try again.",
+  "error401Unauthorized": "Authentication failed. Please reconnect your Nextcloud account.",
+  "error404NotFound": "The requested resource was not found on the server.",
+  "error500Server": "The Nextcloud server encountered an internal error. Please try again later.",
+  "errorNetwork": "Could not reach the server. Please check your internet connection.",
+  "errorUnknown": "An unexpected error occurred."
 }

@@ -6,6 +6,9 @@ import '../l10n/app_localizations.dart';
 import '../services/sync_service.dart';
 import '../state/recipe_provider.dart';
 import '../state/settings_provider.dart';
+import '../data/recipe_database.dart';
+import 'conflict_dialog.dart';
+import 'error_dialog.dart';
 
 /// Settings screen with sections for Sync, Theme, Language, and About.
 class SettingsScreen extends StatelessWidget {
@@ -134,6 +137,28 @@ class _SyncSection extends StatelessWidget {
     try {
       final result = await syncService.sync();
       await recipes.loadRecipes();
+
+      // Handle conflicts interactively.
+      if (result.conflicts > 0 && context.mounted) {
+        final db = context.read<RecipeDatabase>();
+        final conflicts = await db.getConflicts();
+        for (final recipe in conflicts) {
+          if (!context.mounted) break;
+          final choice = await showDialog<ConflictChoice>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => ConflictDialog(recipe: recipe),
+          );
+          if (choice == ConflictChoice.cancelSync) break;
+          if (choice == ConflictChoice.skip || choice == null) continue;
+          await syncService.resolveConflict(
+            recipe.localId!,
+            keepLocal: choice == ConflictChoice.keepLocal,
+          );
+        }
+        await recipes.loadRecipes();
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.syncComplete(result.toString()))),
@@ -141,9 +166,7 @@ class _SyncSection extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Sync error: $e')));
+        showErrorDialog(context, title: l10n.syncErrorTitle, error: e);
       }
     } finally {
       settings.setSyncing(false);

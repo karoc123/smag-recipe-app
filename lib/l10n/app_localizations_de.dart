@@ -9,7 +9,7 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
-  String get appTitle => 'SMAG';
+  String get appTitle => 'Simple Meal Archive Gallery';
 
   @override
   String get recipes => 'Rezepte';
@@ -19,6 +19,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get search => 'Suche';
+
+  @override
+  String get allRecipes => 'Alle Gerichte';
 
   @override
   String get noRecipes => 'Noch keine Rezepte. Importiere oder erstelle eines!';
@@ -212,4 +215,48 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get keepServer => 'Server-Version';
+
+  @override
+  String get cancelSync => 'Sync abbrechen';
+
+  @override
+  String get skipConflict => 'Überspringen';
+
+  @override
+  String get importing => 'Importiere…';
+
+  @override
+  String get errorTitle => 'Fehler';
+
+  @override
+  String get syncErrorTitle => 'Synchronisierungsfehler';
+
+  @override
+  String get copyError => 'Fehler kopieren';
+
+  @override
+  String get errorCopied => 'Fehlerdetails in Zwischenablage kopiert';
+
+  @override
+  String get error409RecipeExists =>
+      'Ein Rezept mit diesem Namen existiert bereits auf dem Server. Bitte benenne das Rezept um und versuche es erneut.';
+
+  @override
+  String get error401Unauthorized =>
+      'Authentifizierung fehlgeschlagen. Bitte verbinde dein Nextcloud-Konto erneut.';
+
+  @override
+  String get error404NotFound =>
+      'Die angeforderte Ressource wurde nicht auf dem Server gefunden.';
+
+  @override
+  String get error500Server =>
+      'Der Nextcloud-Server hat einen internen Fehler. Bitte versuche es später erneut.';
+
+  @override
+  String get errorNetwork =>
+      'Der Server ist nicht erreichbar. Bitte prüfe deine Internetverbindung.';
+
+  @override
+  String get errorUnknown => 'Ein unerwarteter Fehler ist aufgetreten.';
 }

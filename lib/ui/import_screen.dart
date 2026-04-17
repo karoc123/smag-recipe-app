@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
+import '../services/recipe_import_service.dart';
 import '../services/sync_service.dart';
 import '../state/recipe_provider.dart';
 import '../state/settings_provider.dart';
+import 'error_dialog.dart';
 import 'recipe_edit_screen.dart';
 
 /// Unified import screen with two tabs: URL import and text/JSON paste.
@@ -138,7 +140,9 @@ class _UrlImportTabState extends State<_UrlImportTab> {
 
     setState(() => _loading = true);
     try {
-      final result = await context.read<RecipeProvider>().importFromUrl(url);
+      final result = await context.read<RecipeImportService>().importFromUrl(
+        url,
+      );
 
       if (!mounted) return;
 
@@ -153,15 +157,15 @@ class _UrlImportTabState extends State<_UrlImportTab> {
           : result.recipe;
 
       if (!mounted) return;
-      final saved = await Navigator.of(context).push<Recipe>(
-        MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: recipe)),
-      );
-      if (saved != null && mounted) {
-        context.read<RecipeProvider>().loadRecipes();
-        Navigator.of(context).pop();
-      }
+      await _openLocalImportEditor(context, recipe);
     } catch (e) {
-      if (mounted) _showError(e.toString());
+      if (mounted) {
+        showErrorDialog(
+          context,
+          title: AppLocalizations.of(context)!.errorTitle,
+          error: e,
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -338,7 +342,7 @@ class _TextImportTabState extends State<_TextImportTab> {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
 
-    final recipe = context.read<RecipeProvider>().importFromText(text);
+    final recipe = context.read<RecipeImportService>().importFromText(text);
     _openImportChoiceDialog(context, recipe);
   }
 }
@@ -381,14 +385,18 @@ Future<void> _openImportChoiceDialog(
   if (choice == _ImportChoice.nextcloud) {
     await _sendToNextcloud(context, recipe, sourceUrl: sourceUrl);
   } else {
-    // Open editor for local import.
-    final saved = await Navigator.of(context).push<Recipe>(
-      MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: recipe)),
-    );
-    if (saved != null && context.mounted) {
-      context.read<RecipeProvider>().loadRecipes();
-      Navigator.of(context).pop(); // Back to main.
-    }
+    await _openLocalImportEditor(context, recipe);
+  }
+}
+
+Future<void> _openLocalImportEditor(BuildContext context, Recipe recipe) async {
+  final saved = await Navigator.of(context).push<Recipe>(
+    MaterialPageRoute(builder: (_) => RecipeEditScreen(recipe: recipe)),
+  );
+  if (saved != null && context.mounted) {
+    await context.read<RecipeProvider>().loadRecipes();
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
   }
 }
 
@@ -402,20 +410,37 @@ Future<void> _sendToNextcloud(
   final settings = context.read<SettingsProvider>();
   final recipeProvider = context.read<RecipeProvider>();
 
+  // Show a loading dialog that blocks interaction until the import finishes.
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 24),
+            Expanded(child: Text(l10n.sendToNextcloud)),
+          ],
+        ),
+      ),
+    ),
+  );
+
   try {
     settings.setSyncing(true);
     if (sourceUrl != null && sourceUrl.isNotEmpty) {
-      // Let Nextcloud Cookbook import the URL server-side.
       await syncService.importFromUrl(sourceUrl);
     } else {
-      // Fallback for manual text/JSON imports.
       await syncService.pushRecipe(recipe);
     }
-    // Sync to pull it back locally.
     await syncService.sync();
     await recipeProvider.loadRecipes();
 
     if (context.mounted) {
+      // Dismiss the loading dialog.
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.sentToNextcloud)));
@@ -423,9 +448,9 @@ Future<void> _sendToNextcloud(
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      // Dismiss the loading dialog.
+      Navigator.of(context).pop();
+      showErrorDialog(context, title: l10n.syncErrorTitle, error: e);
     }
   } finally {
     settings.setSyncing(false);

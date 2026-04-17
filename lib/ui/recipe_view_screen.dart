@@ -8,7 +8,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
-import '../services/sync_service.dart';
+import '../services/recipe_duration.dart';
+import '../services/recipe_image_cache.dart';
 import '../state/recipe_provider.dart';
 import 'recipe_edit_screen.dart';
 
@@ -115,7 +116,7 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
             // Image
-            if (_current.image.isNotEmpty) _buildImage(context),
+            if (_current.displayImage.isNotEmpty) _buildImage(context),
 
             // Metadata chips
             _buildMetadata(context),
@@ -196,12 +197,26 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
   }
 
   Widget _buildImage(BuildContext context) {
-    final image = _current.image;
+    final image = _current.displayImage;
 
-    // Local cached image for remote recipes.
+    if (_current.localImagePath.isNotEmpty) {
+      final file = File(_current.localImagePath);
+      if (file.existsSync()) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            file,
+            height: 220,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        );
+      }
+    }
+
     if (_current.remoteId != null) {
       return FutureBuilder<String?>(
-        future: SyncService.imagePath(_current.remoteId!),
+        future: context.read<RecipeImageCache>().imagePath(_current.remoteId!),
         builder: (context, snapshot) {
           if (snapshot.data != null) {
             return ClipRRect(
@@ -227,7 +242,6 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
       return _networkImage(image);
     }
 
-    // Local file path.
     final file = File(image);
     if (file.existsSync()) {
       return ClipRRect(
@@ -280,7 +294,9 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
       chips.add(
         Chip(
           avatar: const Icon(Icons.timer_outlined, size: 16),
-          label: Text(_formatDuration(_current.prepTime)),
+          label: Text(
+            RecipeDuration.toDisplay(_current.prepTime, spacedUnits: true),
+          ),
         ),
       );
     }
@@ -288,7 +304,9 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
       chips.add(
         Chip(
           avatar: const Icon(Icons.local_fire_department_outlined, size: 16),
-          label: Text(_formatDuration(_current.cookTime)),
+          label: Text(
+            RecipeDuration.toDisplay(_current.cookTime, spacedUnits: true),
+          ),
         ),
       );
     }
@@ -337,32 +355,6 @@ class _RecipeViewScreenState extends State<RecipeViewScreen> {
       }
       if (mounted) Navigator.of(context).pop();
     }
-  }
-
-  /// Parse ISO-like duration strings (PT20M30S, P0DT0H25M) to readable text.
-  String _formatDuration(String iso8601) {
-    if (iso8601.isEmpty) return '';
-
-    // Match ISO 8601 duration pattern: P[nD]T[nH][nM][nS]
-    final regex = RegExp(
-      r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
-    );
-    final match = regex.firstMatch(iso8601);
-
-    if (match == null) return iso8601;
-
-    final days = int.tryParse(match.group(1) ?? '') ?? 0;
-    final hours = int.tryParse(match.group(2) ?? '') ?? 0;
-    final minutes = int.tryParse(match.group(3) ?? '') ?? 0;
-    final seconds = int.tryParse(match.group(4) ?? '') ?? 0;
-
-    final parts = <String>[];
-    if (days > 0) parts.add('$days d');
-    if (hours > 0) parts.add('$hours h');
-    if (minutes > 0) parts.add('$minutes min');
-    if (seconds > 0) parts.add('$seconds s');
-
-    return parts.isNotEmpty ? parts.join(' ') : iso8601;
   }
 
   /// Launch URL if valid.

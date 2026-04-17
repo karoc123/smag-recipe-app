@@ -11,6 +11,8 @@ import '../domain/recipe.dart';
 /// Stores the full Nextcloud Cookbook JSON per recipe so round-tripping to the
 /// API is lossless. Indexed columns enable fast list / search queries.
 class RecipeDatabase {
+  static const int gridSlotCount = 7;
+
   Database? _db;
 
   Future<Database> get database async {
@@ -55,7 +57,7 @@ class RecipeDatabase {
         ''');
 
         // Initialize 7 grid slots.
-        for (var i = 0; i < 7; i++) {
+        for (var i = 0; i < gridSlotCount; i++) {
           await db.insert('grid_slots', {'position': i, 'recipe_id': null});
         }
 
@@ -125,7 +127,7 @@ class RecipeDatabase {
           'name': recipe.name,
           'category': recipe.recipeCategory,
           'json_data': json,
-          'image_path': recipe.image,
+          'image_path': recipe.localImagePath,
           'sync_status': status.name,
           'date_modified': recipe.dateModified.isEmpty
               ? now
@@ -143,7 +145,7 @@ class RecipeDatabase {
       'name': recipe.name,
       'category': recipe.recipeCategory,
       'json_data': json,
-      'image_path': recipe.image,
+      'image_path': recipe.localImagePath,
       'sync_status': status.name,
       'date_modified': recipe.dateModified.isEmpty ? now : recipe.dateModified,
       'remote_date_modified': recipe.dateModified,
@@ -226,8 +228,8 @@ class RecipeDatabase {
     final db = await database;
     final rows = await db.query(
       'recipes',
-      where: 'sync_status = ?',
-      whereArgs: ['pendingUpload'],
+      where: 'sync_status IN (?, ?)',
+      whereArgs: ['pendingUpload', 'localOnly'],
     );
     return rows.map(_rowToRecipe).toList();
   }
@@ -264,6 +266,11 @@ class RecipeDatabase {
 
   Future<void> clearGridSlot(int position) async {
     await setGridSlot(position, null);
+  }
+
+  Future<void> clearAllGridSlots() async {
+    final db = await database;
+    await db.update('grid_slots', {'recipe_id': null});
   }
 
   Future<void> swapGridSlots(int a, int b) async {
@@ -307,10 +314,23 @@ class RecipeDatabase {
   // Helpers
   // ---------------------------------------------------------------------------
 
+  Future<bool> hasSyncStatus(int localId, SyncStatus status) async {
+    final db = await database;
+    final rows = await db.query(
+      'recipes',
+      columns: ['sync_status'],
+      where: 'local_id = ?',
+      whereArgs: [localId],
+    );
+    if (rows.isEmpty) return false;
+    return rows.first['sync_status'] == status.name;
+  }
+
   Recipe _rowToRecipe(Map<String, dynamic> row) {
     final json = jsonDecode(row['json_data'] as String) as Map<String, dynamic>;
     return Recipe.fromJson(json).copyWith(
       localId: row['local_id'] as int,
+      localImagePath: (row['image_path'] as String?) ?? '',
       remoteId: row['remote_id'] as int?,
     );
   }

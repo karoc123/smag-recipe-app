@@ -28,6 +28,7 @@ This project follows one rule: _Does this feature respect focus, or demand atten
 **From URL:**
 
 - **Import Locally:** extracts structured data via JSON-LD / HTML heuristics and lets you choose an image.
+  Local gallery images are copied into SMAG-managed app storage so they remain stable even if the original picker path disappears.
 - **Send to Nextcloud:** uses Cookbook server-side import endpoint (`POST /apps/cookbook/api/v1/import`), so the server fetches and parses the URL.
 
 **From Text:** paste recipe text (markdown-style) or strict JSON. Use the _Copy Prompt_ button to generate an AI-ready prompt for JSON output.
@@ -38,10 +39,11 @@ Browser sharing is supported: choose **Share** on a URL and select SMAG to open 
 
 ## Nextcloud Integration
 
-SMAG authenticates via the [Nextcloud Android SSO](https://github.com/nextcloud/Android-SingleSignOn/) library (v0.8.1). The installed Nextcloud Android client handles authentication — no manual URL/password entry needed.
+SMAG authenticates via the [Nextcloud Android SSO](https://github.com/nextcloud/Android-SingleSignOn/) library (v1.3.4). The installed Nextcloud Android client handles authentication — no manual URL/password entry needed.
 
 - Connect/disconnect in **Settings → Sync Management**
 - Manual sync trigger (no background sync)
+- Locally selected recipe images are uploaded to your Nextcloud files and referenced from Cookbook during sync
 - Conflict resolution: side-by-side choice of local vs. server version
 - Local delete of synced recipes is queued and executed remotely on the **next sync**
 

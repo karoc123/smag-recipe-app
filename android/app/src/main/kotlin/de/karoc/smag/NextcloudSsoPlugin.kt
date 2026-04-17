@@ -20,6 +20,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.io.ByteArrayInputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -92,6 +93,17 @@ class NextcloudSsoPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
             "performBinaryRequest" -> {
                 val url = call.argument<String>("url") ?: ""
                 performBinaryRequest(url, result)
+            }
+            "performBinaryUpload" -> {
+                val method = call.argument<String>("method") ?: "PUT"
+                val url = call.argument<String>("url") ?: ""
+                val body = call.argument<ByteArray>("body") ?: ByteArray(0)
+                val contentType = call.argument<String>("contentType")
+                    ?: "application/octet-stream"
+                @Suppress("UNCHECKED_CAST")
+                val headers = call.argument<Map<String, String>>("headers")
+                    ?: emptyMap()
+                performBinaryUpload(method, url, body, contentType, headers, result)
             }
             else -> result.notImplemented()
         }
@@ -226,6 +238,45 @@ class NextcloudSsoPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
             } catch (e: Exception) {
                 Log.e(TAG, "Binary request failed: ${e.message}", e)
                 activity?.runOnUiThread { result.success(null) }
+            }
+        }.start()
+    }
+
+    private fun performBinaryUpload(
+        method: String,
+        url: String,
+        body: ByteArray,
+        contentType: String,
+        headers: Map<String, String>,
+        result: MethodChannel.Result
+    ) {
+        Thread {
+            try {
+                val api = getOrCreateApi()
+                if (api == null) {
+                    activity?.runOnUiThread {
+                        result.error("NO_ACCOUNT", "No Nextcloud account", null)
+                    }
+                    return@Thread
+                }
+                val requestHeaders = mutableMapOf<String, List<String>>()
+                requestHeaders["Content-Type"] = listOf(contentType)
+                for ((key, value) in headers) {
+                    requestHeaders[key] = listOf(value)
+                }
+                val request = NextcloudRequest.Builder()
+                    .setMethod(method)
+                    .setUrl(Uri.encode(url, "/?&="))
+                    .setHeader(requestHeaders)
+                    .setRequestBodyAsStream(ByteArrayInputStream(body))
+                    .build()
+                api.performNetworkRequestV2(request).body.close()
+                activity?.runOnUiThread { result.success(null) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Binary upload failed: ${e.message}", e)
+                activity?.runOnUiThread {
+                    result.error("REQUEST_FAILED", e.message, null)
+                }
             }
         }.start()
     }

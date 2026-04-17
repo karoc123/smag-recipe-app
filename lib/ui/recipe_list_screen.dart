@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
 import '../state/recipe_provider.dart';
+import 'recipe_summary_tile.dart';
 import 'recipe_view_screen.dart';
 
 /// Recipe list with category selection first, then filtered recipe view.
@@ -19,25 +19,19 @@ class RecipeListScreen extends StatefulWidget {
 }
 
 class _RecipeListScreenState extends State<RecipeListScreen> {
+  /// null = category picker; empty string = all recipes; non-empty = category.
   String? _selectedCategory;
-  bool _searching = false;
-  final _searchController = TextEditingController();
 
   bool get _inCategory => _selectedCategory != null;
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  /// Sentinel for the "All Recipes" virtual category.
+  static const _allRecipesSentinel = '';
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<RecipeProvider>();
-    final recipes = provider.searchQuery.isNotEmpty
-        ? provider.searchResults
-        : provider.recipes;
+    final recipes = provider.recipes;
 
     // Get all categories
     final allCategories = <String>{};
@@ -48,27 +42,22 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
 
     // If no category selected, show category picker.
     if (_selectedCategory == null) {
-      return PopScope(
-        canPop: true,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(l10n.recipes),
-            automaticallyImplyLeading: false,
-          ),
-          body: _CategoryPicker(
-            categories: categories,
-            onSelect: (cat) {
-              setState(() => _selectedCategory = cat);
-            },
-          ),
-        ),
+      return _CategoryPicker(
+        categories: categories,
+        allRecipesLabel: l10n.allRecipes,
+        onSelect: (cat) {
+          setState(() => _selectedCategory = cat);
+        },
       );
     }
 
-    // Filter recipes to selected category
-    final categoryRecipes = recipes
-        .where((r) => r.displayCategory == _selectedCategory)
-        .toList();
+    // Filter recipes: empty string means show all.
+    final showAll = _selectedCategory == _allRecipesSentinel;
+    final categoryRecipes = showAll
+        ? recipes
+        : recipes.where((r) => r.displayCategory == _selectedCategory).toList();
+
+    final headerTitle = showAll ? l10n.allRecipes : _selectedCategory!;
 
     return PopScope(
       canPop: !_inCategory,
@@ -77,63 +66,36 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
         if (_inCategory) {
           setState(() {
             _selectedCategory = null;
-            _searching = false;
-            _searchController.clear();
-            provider.clearSearch();
           });
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: _searching
-              ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: l10n.search,
-                    border: InputBorder.none,
-                    filled: false,
-                  ),
-                  onChanged: (q) => provider.search(q),
-                )
-              : Text(_selectedCategory!),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              setState(() {
-                _selectedCategory = null;
-                _searching = false;
-                _searchController.clear();
-                provider.clearSearch();
-              });
-            },
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(_searching ? Icons.close : Icons.search),
-              onPressed: () {
-                setState(() {
-                  _searching = !_searching;
-                  if (!_searching) {
-                    _searchController.clear();
-                    provider.clearSearch();
-                  }
-                });
-              },
-            ),
-          ],
-        ),
-        body: categoryRecipes.isEmpty
-            ? Center(child: Text(l10n.noRecipes))
-            : ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: categoryRecipes.length,
-                itemBuilder: (context, i) => _RecipeTile(
-                  recipe: categoryRecipes[i],
-                  peerRecipes: categoryRecipes,
-                  index: i,
-                ),
+      child: Column(
+        children: [
+          Material(
+            child: ListTile(
+              leading: const Icon(Icons.arrow_back),
+              title: Text(
+                headerTitle,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
+              onTap: () => setState(() => _selectedCategory = null),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: categoryRecipes.isEmpty
+                ? Center(child: Text(l10n.noRecipes))
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: categoryRecipes.length,
+                    itemBuilder: (context, i) => _RecipeTile(
+                      recipe: categoryRecipes[i],
+                      peerRecipes: categoryRecipes,
+                      index: i,
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -142,9 +104,14 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
 /// Category picker UI with elegant Scandinavian design.
 class _CategoryPicker extends StatelessWidget {
   final List<String> categories;
+  final String allRecipesLabel;
   final Function(String) onSelect;
 
-  const _CategoryPicker({required this.categories, required this.onSelect});
+  const _CategoryPicker({
+    required this.categories,
+    required this.allRecipesLabel,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +120,21 @@ class _CategoryPicker extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // "All Recipes" always first.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: FilledButton.tonal(
+              onPressed: () => onSelect(''),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                allRecipesLabel,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ),
           ...categories.map(
             (cat) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -190,32 +172,8 @@ class _RecipeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      minVerticalPadding: 0,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: recipe.image.isNotEmpty
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: SizedBox(
-                width: 48,
-                height: 48,
-                child: CachedNetworkImage(
-                  imageUrl: recipe.image,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.image, size: 24),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.image, size: 24),
-                  ),
-                ),
-              ),
-            )
-          : null,
-      title: Align(alignment: Alignment.centerLeft, child: Text(recipe.name)),
-      trailing: const Icon(Icons.chevron_right),
+    return RecipeSummaryTile(
+      recipe: recipe,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(

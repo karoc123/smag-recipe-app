@@ -13,6 +13,7 @@ class Recipe {
   final String description;
   final String url;
   final String image;
+  final String localImagePath;
   final String prepTime;
   final String cookTime;
   final String totalTime;
@@ -32,6 +33,7 @@ class Recipe {
     this.description = '',
     this.url = '',
     this.image = '',
+    this.localImagePath = '',
     this.prepTime = '',
     this.cookTime = '',
     this.totalTime = '',
@@ -102,6 +104,7 @@ class Recipe {
     String? description,
     String? url,
     String? image,
+    String? localImagePath,
     String? prepTime,
     String? cookTime,
     String? totalTime,
@@ -121,6 +124,7 @@ class Recipe {
       description: description ?? this.description,
       url: url ?? this.url,
       image: image ?? this.image,
+      localImagePath: localImagePath ?? this.localImagePath,
       prepTime: prepTime ?? this.prepTime,
       cookTime: cookTime ?? this.cookTime,
       totalTime: totalTime ?? this.totalTime,
@@ -145,6 +149,9 @@ class Recipe {
 
   /// Whether this recipe has ever been pushed / pulled from Nextcloud.
   bool get isRemote => remoteId != null;
+
+  /// Best local or remote image reference for display in the UI.
+  String get displayImage => localImagePath.isNotEmpty ? localImagePath : image;
 
   @override
   bool operator ==(Object other) =>

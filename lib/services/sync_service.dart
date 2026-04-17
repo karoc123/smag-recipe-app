@@ -1,13 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-
-import '../data/nextcloud_api.dart';
-import '../data/nextcloud_sso.dart';
 import '../data/recipe_database.dart';
 import '../domain/recipe.dart';
+import 'recipe_image_cache.dart';
+import 'recipe_remote_gateway.dart';
 
 /// Bidirectional sync engine between local SQLite and Nextcloud Cookbook.
 ///
@@ -18,19 +14,16 @@ import '../domain/recipe.dart';
 ///   4. Flag conflicts for manual resolution.
 class SyncService {
   final RecipeDatabase _db;
-  final NextcloudApi _api;
-  final NextcloudSso _sso;
+  final RecipeRemoteGateway _remoteGateway;
+  final RecipeImageCache _imageCache;
 
-  SyncService(this._db, this._api, this._sso);
+  SyncService(this._db, this._remoteGateway, this._imageCache);
 
   /// Run a full sync cycle. Returns a human-readable summary.
   ///
   /// Throws if no account is linked.
   Future<SyncResult> sync() async {
-    final account = await _sso.getCurrentAccount();
-    if (account == null) {
-      throw StateError('No Nextcloud account linked');
-    }
+    await _remoteGateway.ensureAccountLinked();
 
     int pulled = 0;
     int pushed = 0;
@@ -41,7 +34,7 @@ class SyncService {
     final pendingDeletes = await _db.getPendingDeletions();
     for (final remoteId in pendingDeletes) {
       try {
-        await _api.deleteRecipe(remoteId);
+        await _remoteGateway.deleteRecipe(remoteId);
       } catch (_) {
         // Keep it queued for the next sync attempt.
         continue;
@@ -51,7 +44,7 @@ class SyncService {
     }
 
     // 1. Remote stubs
-    final remoteStubs = await _api.getRecipes();
+    final remoteStubs = await _remoteGateway.getRecipes();
     final remoteIds = <int>{};
 
     // 2. Pull / detect conflicts
@@ -61,9 +54,14 @@ class SyncService {
 
       if (local == null) {
         // New remote recipe → pull full data.
-        final recipe = await _api.getRecipe(stub.id);
-        await _db.upsertRecipe(recipe, syncStatus: SyncStatus.synced);
-        await _downloadImage(stub.id);
+        final recipe = await _remoteGateway.getRecipe(stub.id);
+        final localImagePath = await _downloadImage(stub.id);
+        await _db.upsertRecipe(
+          recipe.copyWith(
+            localImagePath: recipe.image.isEmpty ? '' : (localImagePath ?? ''),
+          ),
+          syncStatus: SyncStatus.synced,
+        );
         pulled++;
         continue;
       }
@@ -71,7 +69,7 @@ class SyncService {
       // Exists locally — check for conflicts.
       final localModified =
           local.dateModified != stub.dateModified &&
-          await _isSyncStatus(local.localId!, SyncStatus.pendingUpload);
+          await _db.hasSyncStatus(local.localId!, SyncStatus.pendingUpload);
 
       if (localModified) {
         // Both sides changed.
@@ -79,12 +77,15 @@ class SyncService {
         conflicts++;
       } else if (local.dateModified != stub.dateModified) {
         // Only remote changed → pull.
-        final recipe = await _api.getRecipe(stub.id);
+        final recipe = await _remoteGateway.getRecipe(stub.id);
+        final localImagePath = await _downloadImage(stub.id);
         await _db.upsertRecipe(
-          recipe.copyWith(localId: local.localId),
+          recipe.copyWith(
+            localId: local.localId,
+            localImagePath: recipe.image.isEmpty ? '' : (localImagePath ?? ''),
+          ),
           syncStatus: SyncStatus.synced,
         );
-        await _downloadImage(stub.id);
         pulled++;
       }
       // else: in sync, nothing to do.
@@ -103,17 +104,18 @@ class SyncService {
     // 4. Push local-only and pending-upload recipes.
     final pending = await _db.getPendingUploads();
     for (final recipe in pending) {
+      final uploadReady = await _prepareRecipeForUpload(recipe);
       if (recipe.remoteId == null) {
         // New local recipe → create on server.
-        final remoteId = await _api.createRecipe(recipe);
-        await _db.upsertRecipe(
+        final remoteId = await _remoteGateway.createRecipe(uploadReady);
+        await _refreshSyncedRecipe(
           recipe.copyWith(remoteId: remoteId),
-          syncStatus: SyncStatus.synced,
+          remoteId: remoteId,
         );
       } else {
         // Modified locally → update on server.
-        await _api.updateRecipe(recipe);
-        await _db.setSyncStatus(recipe.localId!, SyncStatus.synced);
+        await _remoteGateway.updateRecipe(uploadReady);
+        await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
       }
       pushed++;
     }
@@ -133,80 +135,87 @@ class SyncService {
 
     if (keepLocal) {
       // Push local version to server.
-      await _api.updateRecipe(recipe);
-      await _db.setSyncStatus(localId, SyncStatus.synced);
+      final uploadReady = await _prepareRecipeForUpload(recipe);
+      await _remoteGateway.updateRecipe(uploadReady);
+      await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
     } else {
       // Pull remote version.
-      final remote = await _api.getRecipe(recipe.remoteId!);
+      final remote = await _remoteGateway.getRecipe(recipe.remoteId!);
+      final localImagePath = await _downloadImage(recipe.remoteId!);
       await _db.upsertRecipe(
-        remote.copyWith(localId: localId),
+        remote.copyWith(
+          localId: localId,
+          localImagePath: remote.image.isEmpty ? '' : (localImagePath ?? ''),
+        ),
         syncStatus: SyncStatus.synced,
       );
-      await _downloadImage(recipe.remoteId!);
     }
   }
 
   /// Push a single recipe to Nextcloud (for "Send to Nextcloud" import flow).
   /// Returns the new remote id.
   Future<int> pushRecipe(Recipe recipe) async {
-    return _api.createRecipe(recipe);
+    final uploadReady = await _prepareRecipeForUpload(recipe);
+    return _remoteGateway.createRecipe(uploadReady);
   }
 
   /// Let Nextcloud import a recipe URL server-side via Cookbook import endpoint.
   Future<int> importFromUrl(String url) async {
-    return _api.importFromUrl(url);
+    return _remoteGateway.importFromUrl(url);
   }
 
   // ---------------------------------------------------------------------------
   // Image helpers
   // ---------------------------------------------------------------------------
 
-  Future<void> _downloadImage(int remoteId) async {
+  Future<String?> _downloadImage(int remoteId) async {
     try {
-      final bytes = await _api.getImage(remoteId);
+      final bytes = await _remoteGateway.getImage(remoteId);
       if (bytes != null) {
-        await _saveImageToCache(remoteId, bytes);
+        return await _imageCache.save(remoteId, bytes);
       }
     } catch (_) {
       // Non-fatal: recipe works without image.
     }
-  }
-
-  Future<void> _saveImageToCache(int remoteId, Uint8List bytes) async {
-    final dir = await _imageCacheDir();
-    final file = File(p.join(dir.path, '$remoteId.jpg'));
-    await file.writeAsBytes(bytes);
-  }
-
-  /// Returns the local cache path for a remote recipe image, or null.
-  static Future<String?> imagePath(int remoteId) async {
-    final dir = await _imageCacheDir();
-    final file = File(p.join(dir.path, '$remoteId.jpg'));
-    if (await file.exists()) return file.path;
     return null;
   }
 
-  static Future<Directory> _imageCacheDir() async {
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory(p.join(base.path, 'smag_images'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir;
+  Future<Recipe> _prepareRecipeForUpload(Recipe recipe) async {
+    final localImagePath = _localImagePath(recipe);
+    if (localImagePath == null) {
+      return recipe;
+    }
+
+    final bytes = await File(localImagePath).readAsBytes();
+    final remotePath = await _remoteGateway.uploadRecipeImage(recipe, bytes);
+    return recipe.copyWith(image: remotePath);
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  Future<bool> _isSyncStatus(int localId, SyncStatus status) async {
-    final db = await _db.database;
-    final rows = await db.query(
-      'recipes',
-      columns: ['sync_status'],
-      where: 'local_id = ?',
-      whereArgs: [localId],
+  Future<void> _refreshSyncedRecipe(
+    Recipe recipe, {
+    required int remoteId,
+  }) async {
+    final remoteRecipe = await _remoteGateway.getRecipe(remoteId);
+    final cachedImagePath = await _downloadImage(remoteId);
+    await _db.upsertRecipe(
+      remoteRecipe.copyWith(
+        localId: recipe.localId,
+        localImagePath: remoteRecipe.image.isEmpty
+            ? ''
+            : (cachedImagePath ?? recipe.localImagePath),
+      ),
+      syncStatus: SyncStatus.synced,
     );
-    if (rows.isEmpty) return false;
-    return rows.first['sync_status'] == status.name;
+  }
+
+  String? _localImagePath(Recipe recipe) {
+    if (recipe.localImagePath.isNotEmpty) {
+      return recipe.localImagePath;
+    }
+    if (recipe.image.isNotEmpty && !recipe.image.startsWith('http')) {
+      return recipe.image;
+    }
+    return null;
   }
 }
 

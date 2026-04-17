@@ -4,7 +4,7 @@ import '../domain/recipe.dart';
 import '../l10n/app_localizations.dart';
 
 /// Result of a conflict resolution.
-enum ConflictChoice { keepLocal, keepRemote }
+enum ConflictChoice { keepLocal, keepRemote, skip, cancelSync }
 
 /// Dialog that prompts the user to choose between local and remote versions
 /// of a recipe when a sync conflict is detected.
@@ -38,6 +38,14 @@ class ConflictDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
+          onPressed: () => Navigator.pop(context, ConflictChoice.cancelSync),
+          child: Text(l10n.cancelSync),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, ConflictChoice.skip),
+          child: Text(l10n.skipConflict),
+        ),
+        OutlinedButton(
           onPressed: () => Navigator.pop(context, ConflictChoice.keepRemote),
           child: Text(l10n.keepServer),
         ),

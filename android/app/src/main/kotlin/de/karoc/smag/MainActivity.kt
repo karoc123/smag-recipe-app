@@ -39,7 +39,12 @@ class MainActivity : FlutterActivity() {
             pendingUrl = null
             return fromPending
         }
-        return extractIncomingUrl(intent)
+        val url = extractIncomingUrl(intent)
+        if (url != null) {
+            // Clear the intent data so subsequent resume cycles don't re-fire.
+            setIntent(Intent())
+        }
+        return url
     }
 
     private fun extractIncomingUrl(intent: Intent?): String? {

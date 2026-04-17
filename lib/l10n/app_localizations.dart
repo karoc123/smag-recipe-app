@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'SMAG'**
+  /// **'Simple Meal Archive Gallery'**
   String get appTitle;
 
   /// No description provided for @recipes.
@@ -121,6 +121,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search'**
   String get search;
+
+  /// No description provided for @allRecipes.
+  ///
+  /// In en, this message translates to:
+  /// **'All Recipes'**
+  String get allRecipes;
 
   /// No description provided for @noRecipes.
   ///
@@ -493,6 +499,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep Server'**
   String get keepServer;
+
+  /// No description provided for @cancelSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Sync'**
+  String get cancelSync;
+
+  /// No description provided for @skipConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skipConflict;
+
+  /// No description provided for @importing.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing…'**
+  String get importing;
+
+  /// No description provided for @errorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get errorTitle;
+
+  /// No description provided for @syncErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Error'**
+  String get syncErrorTitle;
+
+  /// No description provided for @copyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Error'**
+  String get copyError;
+
+  /// No description provided for @errorCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Error details copied to clipboard'**
+  String get errorCopied;
+
+  /// No description provided for @error409RecipeExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A recipe with this name already exists on the server. Please rename the recipe and try again.'**
+  String get error409RecipeExists;
+
+  /// No description provided for @error401Unauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication failed. Please reconnect your Nextcloud account.'**
+  String get error401Unauthorized;
+
+  /// No description provided for @error404NotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'The requested resource was not found on the server.'**
+  String get error404NotFound;
+
+  /// No description provided for @error500Server.
+  ///
+  /// In en, this message translates to:
+  /// **'The Nextcloud server encountered an internal error. Please try again later.'**
+  String get error500Server;
+
+  /// No description provided for @errorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the server. Please check your internet connection.'**
+  String get errorNetwork;
+
+  /// No description provided for @errorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred.'**
+  String get errorUnknown;
 }
 
 class _AppLocalizationsDelegate

@@ -1,21 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import '../data/recipe_database.dart';
 import '../domain/recipe.dart';
-import '../services/recipe_parser.dart';
-
-/// Result of a URL import: the parsed recipe plus image candidate URLs.
-class UrlImportResult {
-  final Recipe recipe;
-  final List<String> imageCandidates;
-  const UrlImportResult({required this.recipe, required this.imageCandidates});
-}
+import '../services/managed_recipe_image_store.dart';
 
 /// Central recipe state holder backed by SQLite.
 class RecipeProvider extends ChangeNotifier {
   final RecipeDatabase _db;
-  final RecipeParser _parser;
+  final ManagedRecipeImageStore _imageStore;
 
   List<Recipe> _recipes = [];
   List<Recipe> _searchResults = [];
@@ -23,7 +17,7 @@ class RecipeProvider extends ChangeNotifier {
   String _searchQuery = '';
   bool _loading = false;
 
-  RecipeProvider(this._db, this._parser);
+  RecipeProvider(this._db, this._imageStore);
 
   // ---- Getters ----
 
@@ -60,8 +54,12 @@ class RecipeProvider extends ChangeNotifier {
   }
 
   Future<Recipe> saveRecipe(Recipe recipe) async {
+    final existing = recipe.localId == null
+        ? null
+        : await _db.getByLocalId(recipe.localId!);
+    final prepared = await _prepareImage(recipe, existing);
     final now = DateTime.now().toUtc().toIso8601String();
-    final updated = recipe.copyWith(dateModified: now);
+    final updated = prepared.copyWith(dateModified: now);
 
     // Determine sync status: if it has a remoteId, mark as pending upload.
     final status = updated.remoteId != null
@@ -78,6 +76,7 @@ class RecipeProvider extends ChangeNotifier {
     if (recipe?.remoteId != null) {
       await _db.queuePendingDeletion(recipe!.remoteId!);
     }
+    await _deleteManagedImage(recipe?.localImagePath ?? '');
     await _db.removeRecipeFromGrid(localId);
     await _db.deleteRecipe(localId);
     await _refreshState();
@@ -95,38 +94,57 @@ class RecipeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearSearch() {
+  void clearSearch({bool notify = true}) {
     _searchQuery = '';
     _searchResults = [];
-    notifyListeners();
-  }
-
-  // ---- Import ----
-
-  Future<UrlImportResult> importFromUrl(String url) async {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode != 200) {
-      throw Exception('HTTP ${response.statusCode}');
+    if (notify) {
+      notifyListeners();
     }
-    final result = _parser.parseHtmlWithCandidates(
-      response.body,
-      sourceUrl: url,
-    );
-    return UrlImportResult(
-      recipe: result.recipe,
-      imageCandidates: result.imageCandidates,
-    );
   }
-
-  Recipe importFromText(String text) {
-    return _parser.parsePlainText(text);
-  }
-
   // ---- Private ----
 
   Future<void> _refreshState() async {
     _recipes = await _db.getAllRecipes();
     _categories = await _db.getCategories();
     notifyListeners();
+  }
+
+  Future<Recipe> _prepareImage(Recipe recipe, Recipe? existing) async {
+    final image = recipe.image.trim();
+    final localImagePath = recipe.localImagePath.trim();
+
+    if (image.isEmpty) {
+      await _deleteManagedImage(existing?.localImagePath ?? '');
+      return recipe.copyWith(image: '', localImagePath: '');
+    }
+
+    if (image.startsWith('http')) {
+      await _deleteManagedImage(existing?.localImagePath ?? '');
+      return recipe.copyWith(localImagePath: '');
+    }
+
+    if (localImagePath.isEmpty && !File(image).existsSync()) {
+      return recipe.copyWith(localImagePath: '');
+    }
+
+    final managedPath = _imageStore.ownsPath(localImagePath)
+        ? localImagePath
+        : await _imageStore.persist(
+            localImagePath.isNotEmpty ? localImagePath : image,
+          );
+
+    if (existing != null &&
+        existing.localImagePath.isNotEmpty &&
+        existing.localImagePath != managedPath) {
+      await _deleteManagedImage(existing.localImagePath);
+    }
+
+    return recipe.copyWith(image: managedPath, localImagePath: managedPath);
+  }
+
+  Future<void> _deleteManagedImage(String path) async {
+    if (_imageStore.ownsPath(path)) {
+      await _imageStore.delete(path);
+    }
   }
 }

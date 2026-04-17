@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:path/path.dart' as p;
+
 import '../domain/recipe.dart';
 import 'nextcloud_sso.dart';
 
@@ -63,6 +65,20 @@ class NextcloudApi {
     await _sso.request('DELETE', '$_base/recipes/$remoteId');
   }
 
+  /// Upload a local image file into the user's Nextcloud files and return the
+  /// path that Cookbook accepts in the recipe JSON.
+  Future<String> uploadRecipeImage(Recipe recipe, Uint8List bytes) async {
+    final account = await _requireAccount();
+    final uploadPath = _remoteImagePath(recipe);
+    await _sso.binaryUploadRequest(
+      'PUT',
+      '/remote.php/dav/files/${Uri.encodeComponent(account.userId)}/${_encodePath(uploadPath)}',
+      bytes,
+      contentType: _contentTypeForPath(uploadPath),
+    );
+    return uploadPath;
+  }
+
   // ---------------------------------------------------------------------------
   // Images
   // ---------------------------------------------------------------------------
@@ -83,7 +99,69 @@ class NextcloudApi {
       '$_base/import',
       body: jsonEncode({'url': url}),
     );
-    return int.parse(body.trim());
+    // The API may return a plain integer, a JSON integer, or a JSON object
+    // with an "id" field depending on the Nextcloud Cookbook version.
+    final trimmed = body.trim();
+    final asInt = int.tryParse(trimmed);
+    if (asInt != null) return asInt;
+    try {
+      final json = jsonDecode(trimmed);
+      if (json is int) return json;
+      if (json is Map<String, dynamic>) {
+        final id = json['id'] ?? json['recipe_id'];
+        if (id is int) return id;
+        if (id is String) return int.parse(id);
+      }
+    } catch (_) {
+      // Not JSON — ignore
+    }
+    // Fallback: return 0 to indicate success without a parseable id.
+    return 0;
+  }
+
+  Future<NextcloudAccount> _requireAccount() async {
+    final account = await _sso.getCurrentAccount();
+    if (account == null) {
+      throw StateError('No Nextcloud account linked');
+    }
+    return account;
+  }
+
+  String _remoteImagePath(Recipe recipe) {
+    final baseName =
+        '.smag-recipe-image-${recipe.localId ?? recipe.remoteId ?? DateTime.now().millisecondsSinceEpoch}';
+    final extension = _normalizedExtension(
+      recipe.localImagePath.isNotEmpty ? recipe.localImagePath : recipe.image,
+    );
+    return '/$baseName$extension';
+  }
+
+  String _normalizedExtension(String sourcePath) {
+    final extension = p.extension(sourcePath).toLowerCase();
+    if (extension == '.jpeg' ||
+        extension == '.jpg' ||
+        extension == '.png' ||
+        extension == '.webp') {
+      return extension;
+    }
+    return '.jpg';
+  }
+
+  String _contentTypeForPath(String path) {
+    final extension = p.extension(path).toLowerCase();
+    return switch (extension) {
+      '.png' => 'image/png',
+      '.webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+  }
+
+  String _encodePath(String path) {
+    return path
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .map(Uri.encodeComponent)
+        .join('/');
   }
 }
 

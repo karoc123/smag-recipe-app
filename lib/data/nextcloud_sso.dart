@@ -59,6 +59,23 @@ class NextcloudSso {
     );
     return result;
   }
+
+  /// Perform an authenticated binary request with a streamed request body.
+  Future<void> binaryUploadRequest(
+    String method,
+    String url,
+    Uint8List body, {
+    String contentType = 'application/octet-stream',
+    Map<String, String> headers = const {},
+  }) async {
+    await _channel.invokeMethod<void>('performBinaryUpload', {
+      'method': method,
+      'url': url,
+      'body': body,
+      'contentType': contentType,
+      'headers': headers,
+    });
+  }
 }
 
 /// Minimal representation of a Nextcloud account.
