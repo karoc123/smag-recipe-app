@@ -36,6 +36,7 @@ Recipes follow the Nextcloud Cookbook JSON format:
 
 - **The Grid:** A dynamic visual dashboard with exactly one trailing empty (`+`) slot. During drag, the trailing slot becomes a delete target.
   Shopping list aggregation from grid recipes is sorted alphabetically for predictable kitchen use.
+  Returning from recipe detail reloads grid slots so deletions are reflected immediately.
 - **The Search:** Global full-text search accessible from a persistent search icon in the top AppBar. Searches all recipes (name, category, ingredients) via SQLite LIKE, independent of any category selection. Opens a dedicated `SearchScreen` overlay.
 - **The Cook-Mode:** Integration of `wakelock` to keep the screen active.
 - **The Import Engine:**
@@ -78,6 +79,8 @@ Floating bottom-right actions:
 2. **View Toggle** — always visible; toggles recipe list and grid, and sits directly right of `+` in recipe view
 
 Back button: Import/Settings return to the recipe overview.
+
+Settings About section includes links to repository and privacy policy.
 
 Android share integration:
 

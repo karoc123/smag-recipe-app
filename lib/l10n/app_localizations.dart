@@ -506,6 +506,12 @@ abstract class AppLocalizations {
   /// **'GitHub Repository'**
   String get githubRepo;
 
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
   /// No description provided for @philosophy.
   ///
   /// In en, this message translates to:

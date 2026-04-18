@@ -225,6 +225,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get githubRepo => 'GitHub Repository';
 
   @override
+  String get privacyPolicy => 'Privacy Policy';
+
+  @override
   String get philosophy => 'Philosophy (FOSS ❤)';
 
   @override

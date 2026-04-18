@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smag/data/recipe_database.dart';
 import 'package:smag/data/nextcloud_api.dart';
 import 'package:smag/domain/recipe.dart';
+import 'package:smag/domain/sync_date_normalizer.dart';
 import 'package:smag/services/recipe_image_cache.dart';
 import 'package:smag/services/recipe_remote_gateway.dart';
 import 'package:smag/services/sync_service.dart';
@@ -102,9 +103,13 @@ class _FakeRecipeDatabase extends RecipeDatabase {
     int localId,
     String remoteDateModified,
   ) async {
-    final previous = _remoteDateModified[localId] ?? '';
-    if (previous.isEmpty) return true;
-    return previous != remoteDateModified;
+    final previous = normalizeSyncDateModified(
+      _remoteDateModified[localId] ?? '',
+    );
+    final current = normalizeSyncDateModified(remoteDateModified);
+    if (previous.isEmpty) return false;
+    if (current.isEmpty) return false;
+    return previous != current;
   }
 }
 
@@ -358,6 +363,47 @@ void main() {
       expect(db.statusFor(1), SyncStatus.conflict);
       expect(gateway.updatedRecipe, isNull);
     });
+
+    test(
+      'does not mark conflict when remote date format differs but timestamp is identical',
+      () async {
+        final db = _FakeRecipeDatabase();
+        db.seed(
+          const Recipe(
+            localId: 1,
+            remoteId: 14,
+            name: 'Lasagna',
+            dateModified: 'local-change',
+          ),
+          SyncStatus.pendingUpload,
+          remoteDateModified: '2026-04-18T10:30:00+00:00',
+        );
+
+        final gateway = _FakeRemoteGateway()
+          ..stubs = const [
+            RecipeStub(
+              id: 14,
+              name: 'Lasagna',
+              category: 'Dinner',
+              dateModified: '2026-04-18T10:30:00+0000',
+            ),
+          ]
+          ..recipes[14] = const Recipe(
+            remoteId: 14,
+            name: 'Lasagna',
+            dateModified: '2026-04-18T10:30:00+00:00',
+          );
+
+        final imageCache = _FakeRecipeImageCache();
+        final syncService = SyncService(db, gateway, imageCache);
+
+        final result = await syncService.sync();
+
+        expect(result.conflicts, 0);
+        expect(result.pushed, 1);
+        expect(db.statusFor(1), SyncStatus.synced);
+      },
+    );
 
     test(
       'suppresses conflict when image differs only as local path vs managed server path',

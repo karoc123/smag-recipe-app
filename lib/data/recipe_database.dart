@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/recipe.dart';
+import '../domain/sync_date_normalizer.dart';
 
 /// Local SQLite storage for recipes and grid slot assignments.
 ///
@@ -132,7 +133,9 @@ class RecipeDatabase {
             : recipe.dateModified,
       };
       if (status == SyncStatus.synced) {
-        values['remote_date_modified'] = recipe.dateModified;
+        values['remote_date_modified'] = normalizeSyncDateModified(
+          recipe.dateModified,
+        );
       }
 
       await db.update(
@@ -154,7 +157,7 @@ class RecipeDatabase {
       'sync_status': status.name,
       'date_modified': recipe.dateModified.isEmpty ? now : recipe.dateModified,
       'remote_date_modified': status == SyncStatus.synced
-          ? recipe.dateModified
+          ? normalizeSyncDateModified(recipe.dateModified)
           : '',
     });
     return recipe.copyWith(localId: id);
@@ -220,7 +223,9 @@ class RecipeDatabase {
     final db = await database;
     final values = <String, dynamic>{'sync_status': status.name};
     if (remoteDateModified != null) {
-      values['remote_date_modified'] = remoteDateModified;
+      values['remote_date_modified'] = normalizeSyncDateModified(
+        remoteDateModified,
+      );
     }
     await db.update(
       'recipes',
@@ -349,9 +354,18 @@ class RecipeDatabase {
     );
 
     if (rows.isEmpty) return true;
-    final previous = (rows.first['remote_date_modified'] as String?) ?? '';
-    if (previous.isEmpty) return true;
-    return previous != remoteDateModified;
+    final previous = normalizeSyncDateModified(
+      (rows.first['remote_date_modified'] as String?) ?? '',
+    );
+    final current = normalizeSyncDateModified(remoteDateModified);
+
+    // Without comparable timestamps, avoid conflict noise and rely on user
+    // initiated sync operations.
+    if (previous.isEmpty || current.isEmpty) {
+      return false;
+    }
+
+    return previous != current;
   }
 
   Recipe _rowToRecipe(Map<String, dynamic> row) {

@@ -368,10 +368,13 @@ class _FilledSlot extends StatelessWidget {
     );
   }
 
-  void _viewRecipe(BuildContext context) {
-    Navigator.of(
+  Future<void> _viewRecipe(BuildContext context) async {
+    final grid = context.read<GridProvider>();
+    await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => RecipeViewScreen(recipe: recipe)));
+    if (!context.mounted) return;
+    await grid.load();
   }
 }
 

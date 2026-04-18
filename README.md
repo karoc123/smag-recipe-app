@@ -33,6 +33,7 @@ This project follows one rule: _Does this feature respect focus, or demand atten
   - **New Recipe**: opens the recipe editor
   - **Import**: opens the import screen (URL/Text tabs)
 - Import and Settings are opened as dedicated screens and return to the recipe view on back navigation.
+- Settings include direct links to GitHub and Privacy Policy.
 
 ## Import Workflow
 

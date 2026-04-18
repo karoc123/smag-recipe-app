@@ -314,6 +314,19 @@ class _AboutSection extends StatelessWidget {
           ),
         ),
         ListTile(
+          leading: const Icon(Icons.privacy_tip_outlined),
+          title: Text(l10n.privacyPolicy),
+          subtitle: const Text(
+            'github.com/karoc123/smag-recipe-app/blob/main/PRIVACY.md',
+          ),
+          onTap: () => launchUrl(
+            Uri.parse(
+              'https://github.com/karoc123/smag-recipe-app/blob/main/PRIVACY.md',
+            ),
+            mode: LaunchMode.externalApplication,
+          ),
+        ),
+        ListTile(
           leading: const Icon(Icons.favorite_outline),
           title: Text(l10n.philosophy),
           onTap: () => _showPhilosophy(context),

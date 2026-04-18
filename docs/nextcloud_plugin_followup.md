@@ -61,3 +61,19 @@ Introduce a lightweight transaction flow:
 
 - Better failure handling for unstable networks
 - Easier idempotent retries from mobile clients
+
+## 5. Canonicalize `dateModified` Format Across Endpoints
+
+### 5.1 Current Plugin Reality
+
+Different endpoints may return equivalent timestamps in different string forms
+(for example `+0000` vs `+00:00`).
+
+### 5.2 Suggested Enhancement
+
+Return `dateModified` in one canonical format for all recipe endpoints.
+
+### 5.3 Benefits
+
+- Fewer client-side normalization rules
+- Lower risk of false-positive conflict detection

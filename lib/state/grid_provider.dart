@@ -79,6 +79,16 @@ class GridProvider extends ChangeNotifier {
   Future<Recipe?> recipeAt(int index) async {
     final id = _slots[index];
     if (id == null) return null;
-    return _db.getByLocalId(id);
+    final recipe = await _db.getByLocalId(id);
+    if (recipe != null) {
+      return recipe;
+    }
+
+    // The slot still points to a deleted recipe. Clear it immediately so the
+    // grid updates without waiting for a full reload.
+    await _db.clearGridSlot(index);
+    _slots[index] = null;
+    notifyListeners();
+    return null;
   }
 }
