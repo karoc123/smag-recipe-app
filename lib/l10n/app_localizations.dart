@@ -380,6 +380,60 @@ abstract class AppLocalizations {
   /// **'Sync complete: {details}'**
   String syncComplete(String details);
 
+  /// No description provided for @cookbookFolderOverrideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cookbook Folder Override'**
+  String get cookbookFolderOverrideTitle;
+
+  /// No description provided for @cookbookFolderOverrideField.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Path'**
+  String get cookbookFolderOverrideField;
+
+  /// No description provided for @cookbookFolderOverrideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional path (for example /Recipes). Leave empty to use the folder from Nextcloud config.'**
+  String get cookbookFolderOverrideHint;
+
+  /// No description provided for @cookbookFolderUsesServerConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Using folder from Nextcloud config'**
+  String get cookbookFolderUsesServerConfig;
+
+  /// No description provided for @cookbookFolderOverrideActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual override active: {path}'**
+  String cookbookFolderOverrideActive(String path);
+
+  /// No description provided for @cookbookFolderOverrideWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual folder override enabled'**
+  String get cookbookFolderOverrideWarningTitle;
+
+  /// No description provided for @cookbookFolderOverrideWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This value normally comes from Nextcloud Cookbook. Use an override only for troubleshooting.'**
+  String get cookbookFolderOverrideWarningBody;
+
+  /// No description provided for @useServerFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Server Folder'**
+  String get useServerFolder;
+
+  /// No description provided for @cookbookFolderOverrideInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid folder path.'**
+  String get cookbookFolderOverrideInvalid;
+
   /// No description provided for @connectNextcloud.
   ///
   /// In en, this message translates to:

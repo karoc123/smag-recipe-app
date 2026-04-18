@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../domain/cookbook_path_policy.dart';
 import '../l10n/app_localizations.dart';
 import '../state/settings_provider.dart';
 import 'sync_log_screen.dart';
@@ -67,6 +68,24 @@ class _SyncSection extends StatelessWidget {
             onTap: settings.syncing ? null : () => _openSyncScreen(context),
           ),
           ListTile(
+            leading: const Icon(Icons.folder_outlined),
+            title: Text(l10n.cookbookFolderOverrideTitle),
+            subtitle: Text(
+              settings.cookbookFolderOverride == null
+                  ? l10n.cookbookFolderUsesServerConfig
+                  : l10n.cookbookFolderOverrideActive(
+                      settings.cookbookFolderOverride!,
+                    ),
+            ),
+            onTap: () => _editCookbookFolderOverride(context),
+          ),
+          if (settings.hasCookbookFolderOverride)
+            ListTile(
+              leading: const Icon(Icons.warning_amber_rounded),
+              title: Text(l10n.cookbookFolderOverrideWarningTitle),
+              subtitle: Text(l10n.cookbookFolderOverrideWarningBody),
+            ),
+          ListTile(
             leading: const Icon(Icons.logout),
             title: Text(l10n.disconnectAccount),
             onTap: () => _disconnect(context),
@@ -126,6 +145,72 @@ class _SyncSection extends StatelessWidget {
     );
     if (confirmed == true && context.mounted) {
       await context.read<SettingsProvider>().unlinkAccount();
+    }
+  }
+
+  Future<void> _editCookbookFolderOverride(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final controller = TextEditingController(
+      text: settings.cookbookFolderOverride ?? '',
+    );
+
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.cookbookFolderOverrideTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.cookbookFolderOverrideHint),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: '/Rezepte',
+                labelText: l10n.cookbookFolderOverrideField,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.cookbookFolderOverrideWarningBody,
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ''),
+            child: Text(l10n.useServerFolder),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || !context.mounted) return;
+
+    if (result.trim().isEmpty) {
+      await settings.clearCookbookFolderOverride();
+      return;
+    }
+
+    try {
+      final normalized = CookbookPathPolicy.normalizeFolderPath(result);
+      await settings.setCookbookFolderOverride(normalized);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.cookbookFolderOverrideInvalid)),
+      );
     }
   }
 }

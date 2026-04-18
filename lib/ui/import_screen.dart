@@ -433,9 +433,14 @@ Future<void> _sendToNextcloud(
     if (sourceUrl != null && sourceUrl.isNotEmpty) {
       await syncService.importFromUrl(sourceUrl);
     } else {
-      await syncService.pushRecipe(recipe);
+      await syncService.pushRecipe(
+        recipe,
+        cookbookFolderOverride: settings.cookbookFolderOverride,
+      );
     }
-    await syncService.sync();
+    await syncService.sync(
+      cookbookFolderOverride: settings.cookbookFolderOverride,
+    );
     await recipeProvider.loadRecipes();
 
     if (context.mounted) {

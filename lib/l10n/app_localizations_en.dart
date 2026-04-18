@@ -154,6 +154,39 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cookbookFolderOverrideTitle => 'Cookbook Folder Override';
+
+  @override
+  String get cookbookFolderOverrideField => 'Folder Path';
+
+  @override
+  String get cookbookFolderOverrideHint =>
+      'Optional path (for example /Recipes). Leave empty to use the folder from Nextcloud config.';
+
+  @override
+  String get cookbookFolderUsesServerConfig =>
+      'Using folder from Nextcloud config';
+
+  @override
+  String cookbookFolderOverrideActive(String path) {
+    return 'Manual override active: $path';
+  }
+
+  @override
+  String get cookbookFolderOverrideWarningTitle =>
+      'Manual folder override enabled';
+
+  @override
+  String get cookbookFolderOverrideWarningBody =>
+      'This value normally comes from Nextcloud Cookbook. Use an override only for troubleshooting.';
+
+  @override
+  String get useServerFolder => 'Use Server Folder';
+
+  @override
+  String get cookbookFolderOverrideInvalid => 'Invalid folder path.';
+
+  @override
   String get connectNextcloud => 'Connect Nextcloud';
 
   @override

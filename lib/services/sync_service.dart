@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../data/recipe_database.dart';
+import '../domain/cookbook_path_policy.dart';
 import '../domain/recipe.dart';
 import 'recipe_image_cache.dart';
 import 'recipe_remote_gateway.dart';
@@ -22,9 +23,18 @@ class SyncService {
   /// Run a full sync cycle. Returns a human-readable summary.
   ///
   /// Throws if no account is linked.
-  Future<SyncResult> sync({void Function(String entry)? onLog}) async {
+  Future<SyncResult> sync({
+    void Function(String entry)? onLog,
+    String? cookbookFolderOverride,
+  }) async {
     await _remoteGateway.ensureAccountLinked();
     void log(String message) => onLog?.call(message);
+
+    final cookbookFolderPath = await _resolveCookbookFolderPath(
+      overridePath: cookbookFolderOverride,
+      log: log,
+    );
+    log('Cookbook folder resolved to "$cookbookFolderPath".');
 
     int pulled = 0;
     int pushed = 0;
@@ -148,20 +158,33 @@ class SyncService {
     // 4. Push local-only and pending-upload recipes.
     final pending = await _db.getPendingUploads();
     for (final recipe in pending) {
-      final uploadReady = await _prepareRecipeForUpload(recipe);
-      if (recipe.remoteId == null) {
-        // New local recipe → create on server.
-        final remoteId = await _remoteGateway.createRecipe(uploadReady);
-        await _refreshSyncedRecipe(
-          recipe.copyWith(remoteId: remoteId),
-          remoteId: remoteId,
+      final uploadReady = await _prepareRecipeForUpload(
+        recipe,
+        cookbookFolderPath: cookbookFolderPath,
+      );
+      try {
+        if (recipe.remoteId == null) {
+          // New local recipe → create on server.
+          final remoteId = await _remoteGateway.createRecipe(
+            uploadReady.recipe,
+          );
+          await _refreshSyncedRecipe(
+            recipe.copyWith(remoteId: remoteId),
+            remoteId: remoteId,
+          );
+          log('Pushed new local recipe "${recipe.name}" to server.');
+        } else {
+          // Modified locally → update on server.
+          await _remoteGateway.updateRecipe(uploadReady.recipe);
+          await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
+          log('Updated remote recipe "${recipe.name}" (#${recipe.remoteId}).');
+        }
+      } finally {
+        await _cleanupStagedUpload(
+          uploadReady.stagedFilePath,
+          cookbookFolderPath: cookbookFolderPath,
+          log: log,
         );
-        log('Pushed new local recipe "${recipe.name}" to server.');
-      } else {
-        // Modified locally → update on server.
-        await _remoteGateway.updateRecipe(uploadReady);
-        await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
-        log('Updated remote recipe "${recipe.name}" (#${recipe.remoteId}).');
       }
       pushed++;
     }
@@ -179,15 +202,33 @@ class SyncService {
   }
 
   /// Resolve a conflict by keeping either the local or remote version.
-  Future<void> resolveConflict(int localId, {required bool keepLocal}) async {
+  Future<void> resolveConflict(
+    int localId, {
+    required bool keepLocal,
+    String? cookbookFolderOverride,
+  }) async {
     final recipe = await _db.getByLocalId(localId);
     if (recipe == null || recipe.remoteId == null) return;
 
+    final cookbookFolderPath = await _resolveCookbookFolderPath(
+      overridePath: cookbookFolderOverride,
+    );
+
     if (keepLocal) {
       // Push local version to server.
-      final uploadReady = await _prepareRecipeForUpload(recipe);
-      await _remoteGateway.updateRecipe(uploadReady);
-      await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
+      final uploadReady = await _prepareRecipeForUpload(
+        recipe,
+        cookbookFolderPath: cookbookFolderPath,
+      );
+      try {
+        await _remoteGateway.updateRecipe(uploadReady.recipe);
+        await _refreshSyncedRecipe(recipe, remoteId: recipe.remoteId!);
+      } finally {
+        await _cleanupStagedUpload(
+          uploadReady.stagedFilePath,
+          cookbookFolderPath: cookbookFolderPath,
+        );
+      }
     } else {
       // Pull remote version.
       final remote = await _remoteGateway.getRecipe(recipe.remoteId!);
@@ -204,9 +245,25 @@ class SyncService {
 
   /// Push a single recipe to Nextcloud (for "Send to Nextcloud" import flow).
   /// Returns the new remote id.
-  Future<int> pushRecipe(Recipe recipe) async {
-    final uploadReady = await _prepareRecipeForUpload(recipe);
-    return _remoteGateway.createRecipe(uploadReady);
+  Future<int> pushRecipe(
+    Recipe recipe, {
+    String? cookbookFolderOverride,
+  }) async {
+    final cookbookFolderPath = await _resolveCookbookFolderPath(
+      overridePath: cookbookFolderOverride,
+    );
+    final uploadReady = await _prepareRecipeForUpload(
+      recipe,
+      cookbookFolderPath: cookbookFolderPath,
+    );
+    try {
+      return _remoteGateway.createRecipe(uploadReady.recipe);
+    } finally {
+      await _cleanupStagedUpload(
+        uploadReady.stagedFilePath,
+        cookbookFolderPath: cookbookFolderPath,
+      );
+    }
   }
 
   /// Let Nextcloud import a recipe URL server-side via Cookbook import endpoint.
@@ -239,15 +296,25 @@ class SyncService {
     return null;
   }
 
-  Future<Recipe> _prepareRecipeForUpload(Recipe recipe) async {
+  Future<_PreparedUploadRecipe> _prepareRecipeForUpload(
+    Recipe recipe, {
+    required String cookbookFolderPath,
+  }) async {
     final localImagePath = _localImagePath(recipe);
     if (localImagePath == null) {
-      return recipe;
+      return _PreparedUploadRecipe(recipe: recipe);
     }
 
     final bytes = await File(localImagePath).readAsBytes();
-    final remotePath = await _remoteGateway.uploadRecipeImage(recipe, bytes);
-    return recipe.copyWith(image: remotePath);
+    final staged = await _remoteGateway.uploadRecipeImage(
+      recipe,
+      bytes,
+      cookbookFolderPath: cookbookFolderPath,
+    );
+    return _PreparedUploadRecipe(
+      recipe: recipe.copyWith(image: staged.recipeImagePath),
+      stagedFilePath: staged.stagedFilePath,
+    );
   }
 
   Future<void> _refreshSyncedRecipe(
@@ -268,10 +335,13 @@ class SyncService {
   }
 
   String? _localImagePath(Recipe recipe) {
-    if (recipe.localImagePath.isNotEmpty) {
+    if (recipe.localImagePath.isNotEmpty &&
+        File(recipe.localImagePath).existsSync()) {
       return recipe.localImagePath;
     }
-    if (recipe.image.isNotEmpty && !recipe.image.startsWith('http')) {
+    if (recipe.image.isNotEmpty &&
+        !recipe.image.startsWith('http') &&
+        File(recipe.image).existsSync()) {
       return recipe.image;
     }
     return null;
@@ -328,8 +398,47 @@ class SyncService {
   }
 
   bool _isRemoteManagedImagePath(String image) {
-    return image.startsWith('/.smag-recipe-image-');
+    final normalized = image.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+    return normalized == 'full.jpg' || normalized.endsWith('/full.jpg');
   }
+
+  Future<String> _resolveCookbookFolderPath({
+    required String? overridePath,
+    void Function(String entry)? log,
+  }) async {
+    if (overridePath != null && overridePath.trim().isNotEmpty) {
+      final normalized = CookbookPathPolicy.normalizeFolderPath(overridePath);
+      log?.call('Using manual cookbook folder override "$normalized".');
+      return normalized;
+    }
+
+    return _remoteGateway.getCookbookFolderPath();
+  }
+
+  Future<void> _cleanupStagedUpload(
+    String? stagedFilePath, {
+    required String cookbookFolderPath,
+    void Function(String entry)? log,
+  }) async {
+    if (stagedFilePath == null || stagedFilePath.isEmpty) return;
+    try {
+      await _remoteGateway.deleteUserFile(
+        stagedFilePath,
+        cookbookFolderPath: cookbookFolderPath,
+      );
+    } catch (e) {
+      // Best-effort cleanup to avoid leaving temporary upload files around.
+      log?.call('Failed to delete staged file "$stagedFilePath": $e');
+    }
+  }
+}
+
+class _PreparedUploadRecipe {
+  final Recipe recipe;
+  final String? stagedFilePath;
+
+  const _PreparedUploadRecipe({required this.recipe, this.stagedFilePath});
 }
 
 /// Summary of a sync operation.

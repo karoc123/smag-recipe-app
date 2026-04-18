@@ -10,6 +10,7 @@ enum AppTheme { light, oledDark }
 class SettingsProvider extends ChangeNotifier {
   static const _keyTheme = 'smag_theme';
   static const _keyLocale = 'smag_locale';
+  static const _keyCookbookFolderOverride = 'smag_cookbook_folder_override';
 
   final NextcloudSso _sso;
 
@@ -17,6 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   Locale _locale = const Locale('de');
   NextcloudAccount? _account;
   bool _syncing = false;
+  String _cookbookFolderOverride = '';
 
   SettingsProvider(this._sso);
 
@@ -27,6 +29,12 @@ class SettingsProvider extends ChangeNotifier {
   NextcloudAccount? get account => _account;
   bool get isLinked => _account != null;
   bool get syncing => _syncing;
+  String? get cookbookFolderOverride {
+    final trimmed = _cookbookFolderOverride.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  bool get hasCookbookFolderOverride => cookbookFolderOverride != null;
 
   // ---- Initialization ----
 
@@ -41,6 +49,8 @@ class SettingsProvider extends ChangeNotifier {
 
     final localeCode = prefs.getString(_keyLocale) ?? 'de';
     _locale = Locale(localeCode);
+
+    _cookbookFolderOverride = prefs.getString(_keyCookbookFolderOverride) ?? '';
 
     try {
       _account = await _sso.getCurrentAccount();
@@ -89,5 +99,16 @@ class SettingsProvider extends ChangeNotifier {
   void setSyncing(bool v) {
     _syncing = v;
     notifyListeners();
+  }
+
+  Future<void> setCookbookFolderOverride(String value) async {
+    _cookbookFolderOverride = value.trim();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCookbookFolderOverride, _cookbookFolderOverride);
+  }
+
+  Future<void> clearCookbookFolderOverride() async {
+    await setCookbookFolderOverride('');
   }
 }

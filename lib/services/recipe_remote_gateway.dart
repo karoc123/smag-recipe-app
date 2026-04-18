@@ -6,11 +6,20 @@ import '../domain/recipe.dart';
 
 abstract interface class RecipeRemoteGateway {
   Future<void> ensureAccountLinked();
+  Future<String> getCookbookFolderPath();
   Future<List<RecipeStub>> getRecipes();
   Future<Recipe> getRecipe(int id);
   Future<int> createRecipe(Recipe recipe);
   Future<void> updateRecipe(Recipe recipe);
-  Future<String> uploadRecipeImage(Recipe recipe, Uint8List bytes);
+  Future<StagedRecipeImage> uploadRecipeImage(
+    Recipe recipe,
+    Uint8List bytes, {
+    required String cookbookFolderPath,
+  });
+  Future<void> deleteUserFile(
+    String path, {
+    required String cookbookFolderPath,
+  });
   Future<void> deleteRecipe(int remoteId);
   Future<int> importFromUrl(String url);
   Future<Uint8List?> getImage(int remoteId, {String size});
@@ -34,6 +43,14 @@ class NextcloudRecipeRemoteGateway implements RecipeRemoteGateway {
   Future<int> createRecipe(Recipe recipe) => _api.createRecipe(recipe);
 
   @override
+  Future<void> deleteUserFile(
+    String path, {
+    required String cookbookFolderPath,
+  }) {
+    return _api.deleteUserFile(path, cookbookFolderPath: cookbookFolderPath);
+  }
+
+  @override
   Future<void> deleteRecipe(int remoteId) => _api.deleteRecipe(remoteId);
 
   @override
@@ -42,8 +59,22 @@ class NextcloudRecipeRemoteGateway implements RecipeRemoteGateway {
   }
 
   @override
-  Future<String> uploadRecipeImage(Recipe recipe, Uint8List bytes) {
-    return _api.uploadRecipeImage(recipe, bytes);
+  Future<String> getCookbookFolderPath() async {
+    final config = await _api.getConfig();
+    return config.folderPath;
+  }
+
+  @override
+  Future<StagedRecipeImage> uploadRecipeImage(
+    Recipe recipe,
+    Uint8List bytes, {
+    required String cookbookFolderPath,
+  }) {
+    return _api.uploadRecipeImage(
+      recipe,
+      bytes,
+      cookbookFolderPath: cookbookFolderPath,
+    );
   }
 
   @override

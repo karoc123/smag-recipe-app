@@ -117,10 +117,17 @@ class _SyncLogScreenState extends State<SyncLogScreen> {
     _appendLog('Starting sync.');
 
     try {
-      final result = await syncService.sync(onLog: _appendLog);
+      final result = await syncService.sync(
+        onLog: _appendLog,
+        cookbookFolderOverride: settings.cookbookFolderOverride,
+      );
       await recipeProvider.loadRecipes();
 
-      final canceled = await _resolveConflicts(syncService, db);
+      final canceled = await _resolveConflicts(
+        syncService,
+        db,
+        cookbookFolderOverride: settings.cookbookFolderOverride,
+      );
       final remainingConflicts = (await db.getConflicts()).length;
       if (remainingConflicts > 0) {
         _appendLog('Remaining conflicts: $remainingConflicts.');
@@ -151,8 +158,9 @@ class _SyncLogScreenState extends State<SyncLogScreen> {
 
   Future<bool> _resolveConflicts(
     SyncService syncService,
-    RecipeDatabase db,
-  ) async {
+    RecipeDatabase db, {
+    String? cookbookFolderOverride,
+  }) async {
     final conflicts = await db.getConflicts();
     if (conflicts.isEmpty) {
       _appendLog('No conflicts detected.');
@@ -192,6 +200,7 @@ class _SyncLogScreenState extends State<SyncLogScreen> {
       await syncService.resolveConflict(
         localRecipe.localId!,
         keepLocal: keepLocal,
+        cookbookFolderOverride: cookbookFolderOverride,
       );
       _appendLog(
         keepLocal

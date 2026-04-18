@@ -1,3 +1,5 @@
+# Technical Specification
+
 **Framework:** Flutter
 **Data Format:** Nextcloud Cookbook JSON schema (schema.org Recipe) stored in SQLite.
 **Sync:** Nextcloud Cookbook Plugin API v1 via Android SSO.
@@ -43,14 +45,18 @@ Recipes follow the Nextcloud Cookbook JSON format:
 - **The Sync Engine:**
   - **Bidirectional** sync with remote baseline tracking (`remote_date_modified`) to distinguish "local-only changes" from true local+remote conflicts.
   - Locally created recipes (`localOnly`) are automatically pushed to the server during sync when a Nextcloud account is linked.
-  - Local image files are uploaded into the user's Nextcloud files via WebDAV before recipe create/update, then the remote recipe is refreshed and its server image is cached locally.
+  - Before sync, the app fetches the active Cookbook folder from `GET /apps/cookbook/api/v1/config`.
+  - Local image files are uploaded as temporary staged files **inside the configured Cookbook folder only** before recipe create/update. Files outside that folder are never touched by SMAG's WebDAV operations.
+  - After create/update, staged upload files are cleaned up best-effort and the recipe is refreshed from the server so local cache reflects canonical Cookbook state (`full.jpg`, `thumb.jpg`, `thumb16.jpg`).
   - Manual trigger only (no background sync).
   - Sync executes in a dedicated **Sync Log** screen with copy-to-clipboard support.
   - **Conflict resolution dialog** with four options: **Keep Local**, **Keep Server**, **Skip** (leave in conflict state), and **Cancel Sync** (abort remaining conflict resolution).
   - Conflict dialogs display differing fields and values for **Local** vs **Server** versions.
-  - Conflicts are suppressed when the only discrepancy is a local image file path versus a managed Nextcloud image path.
+  - The conflict UI suppresses image-path noise; image differences are only shown when both sides are external HTTP(S) URLs.
+  - Conflicts are suppressed when the only discrepancy is a local image file path versus a managed Cookbook image reference (`full.jpg` path variants).
   - Unresolved conflicts remain explicit across sync runs and are never auto-overwritten.
   - Pending remote deletions are executed first at sync start.
+  - A manual cookbook-folder override is available in settings for troubleshooting. It is explicitly marked as an override because the authoritative source is Nextcloud config.
 
 ### 4. Authentication
 

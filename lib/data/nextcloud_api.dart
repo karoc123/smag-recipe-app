@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
+import '../domain/cookbook_path_policy.dart';
 import '../domain/recipe.dart';
 import 'nextcloud_sso.dart';
 
@@ -67,16 +68,57 @@ class NextcloudApi {
 
   /// Upload a local image file into the user's Nextcloud files and return the
   /// path that Cookbook accepts in the recipe JSON.
-  Future<String> uploadRecipeImage(Recipe recipe, Uint8List bytes) async {
+  Future<StagedRecipeImage> uploadRecipeImage(
+    Recipe recipe,
+    Uint8List bytes, {
+    required String cookbookFolderPath,
+  }) async {
     final account = await _requireAccount();
-    final uploadPath = _remoteImagePath(recipe);
+    final uploadPath = _stagedImagePath(recipe, cookbookFolderPath);
+    final guardedPath = CookbookPathPolicy.assertPathInsideFolder(
+      path: uploadPath,
+      folderPath: cookbookFolderPath,
+    );
     await _sso.binaryUploadRequest(
       'PUT',
-      '/remote.php/dav/files/${Uri.encodeComponent(account.userId)}/${_encodePath(uploadPath)}',
+      '/remote.php/dav/files/${Uri.encodeComponent(account.userId)}/${_encodePath(guardedPath)}',
       bytes,
       contentType: _contentTypeForPath(uploadPath),
     );
-    return uploadPath;
+    return StagedRecipeImage(
+      recipeImagePath: guardedPath,
+      stagedFilePath: guardedPath,
+    );
+  }
+
+  /// Delete a user file used for temporary image staging.
+  Future<void> deleteUserFile(
+    String path, {
+    required String cookbookFolderPath,
+  }) async {
+    final account = await _requireAccount();
+    final guardedPath = CookbookPathPolicy.assertPathInsideFolder(
+      path: path,
+      folderPath: cookbookFolderPath,
+    );
+    await _sso.request(
+      'DELETE',
+      '/remote.php/dav/files/${Uri.encodeComponent(account.userId)}/${_encodePath(guardedPath)}',
+    );
+  }
+
+  /// Fetch user-specific cookbook configuration.
+  Future<NextcloudCookbookConfig> getConfig() async {
+    final body = await _sso.request('GET', '$_base/config');
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final folderRaw = (json['folder'] ?? '').toString();
+    if (folderRaw.trim().isEmpty) {
+      throw StateError('Cookbook config did not return a valid "folder".');
+    }
+
+    return NextcloudCookbookConfig(
+      folderPath: CookbookPathPolicy.normalizeFolderPath(folderRaw),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -127,13 +169,21 @@ class NextcloudApi {
     return account;
   }
 
-  String _remoteImagePath(Recipe recipe) {
+  String _stagedImagePath(Recipe recipe, String cookbookFolderPath) {
+    final normalizedFolder = CookbookPathPolicy.normalizeFolderPath(
+      cookbookFolderPath,
+    );
+    final token = recipe.localId != null
+        ? 'l${recipe.localId}'
+        : recipe.remoteId != null
+        ? 'r${recipe.remoteId}'
+        : 't${DateTime.now().millisecondsSinceEpoch}';
     final baseName =
-        '.smag-recipe-image-${recipe.localId ?? recipe.remoteId ?? DateTime.now().millisecondsSinceEpoch}';
+        '.smag-upload-$token-${DateTime.now().microsecondsSinceEpoch}';
     final extension = _normalizedExtension(
       recipe.localImagePath.isNotEmpty ? recipe.localImagePath : recipe.image,
     );
-    return '/$baseName$extension';
+    return '$normalizedFolder/$baseName$extension';
   }
 
   String _normalizedExtension(String sourcePath) {
@@ -163,6 +213,22 @@ class NextcloudApi {
         .map(Uri.encodeComponent)
         .join('/');
   }
+}
+
+class NextcloudCookbookConfig {
+  final String folderPath;
+
+  const NextcloudCookbookConfig({required this.folderPath});
+}
+
+class StagedRecipeImage {
+  final String recipeImagePath;
+  final String stagedFilePath;
+
+  const StagedRecipeImage({
+    required this.recipeImagePath,
+    required this.stagedFilePath,
+  });
 }
 
 /// Lightweight recipe preview returned by the list endpoint.

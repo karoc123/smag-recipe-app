@@ -154,6 +154,39 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get cookbookFolderOverrideTitle => 'Cookbook-Ordner überschreiben';
+
+  @override
+  String get cookbookFolderOverrideField => 'Ordnerpfad';
+
+  @override
+  String get cookbookFolderOverrideHint =>
+      'Optionaler Pfad (zum Beispiel /Rezepte). Leer lassen, um den Ordner aus der Nextcloud-Konfiguration zu verwenden.';
+
+  @override
+  String get cookbookFolderUsesServerConfig =>
+      'Verwende Ordner aus der Nextcloud-Konfiguration';
+
+  @override
+  String cookbookFolderOverrideActive(String path) {
+    return 'Manuelle Überschreibung aktiv: $path';
+  }
+
+  @override
+  String get cookbookFolderOverrideWarningTitle =>
+      'Manuelle Ordner-Überschreibung aktiv';
+
+  @override
+  String get cookbookFolderOverrideWarningBody =>
+      'Dieser Wert kommt normalerweise aus Nextcloud Cookbook. Verwende eine Überschreibung nur zur Fehlersuche.';
+
+  @override
+  String get useServerFolder => 'Server-Ordner verwenden';
+
+  @override
+  String get cookbookFolderOverrideInvalid => 'Ungültiger Ordnerpfad.';
+
+  @override
   String get connectNextcloud => 'Nextcloud verbinden';
 
   @override

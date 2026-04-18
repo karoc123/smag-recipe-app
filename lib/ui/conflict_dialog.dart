@@ -133,7 +133,7 @@ class ConflictDialog extends StatelessWidget {
     add('totalTime', localRecipe.totalTime, remote.totalTime);
     add('keywords', localRecipe.keywords, remote.keywords);
     add('url', localRecipe.url, remote.url);
-    if (!_isEquivalentImageAlias(localRecipe, remote)) {
+    if (_shouldShowImageDifference(localRecipe, remote)) {
       add('image', localRecipe.image, remote.image);
     }
     add(
@@ -152,21 +152,22 @@ class ConflictDialog extends StatelessWidget {
 
   String _normalize(String value) => value.trim();
 
-  bool _isEquivalentImageAlias(Recipe local, Recipe remote) {
+  bool _shouldShowImageDifference(Recipe local, Recipe remote) {
     final localImage = local.image.trim();
     final remoteImage = remote.image.trim();
-    if (localImage == remoteImage) {
-      return true;
+    if (localImage.isEmpty && remoteImage.isEmpty) {
+      return false;
     }
 
-    final localIsFilePath =
-        (local.localImagePath.isNotEmpty &&
-            localImage == local.localImagePath) ||
-        localImage.startsWith('/data/') ||
-        localImage.contains('/app_flutter/');
-    final remoteIsManagedPath = remoteImage.startsWith('/.smag-recipe-image-');
+    final bothExternal =
+        _isExternalUrl(localImage) && _isExternalUrl(remoteImage);
+    if (!bothExternal) return false;
 
-    return localIsFilePath && remoteIsManagedPath;
+    return _normalize(localImage) != _normalize(remoteImage);
+  }
+
+  bool _isExternalUrl(String value) {
+    return value.startsWith('http://') || value.startsWith('https://');
   }
 
   String _displayValue(String value) => value.trim().isEmpty ? '-' : value;

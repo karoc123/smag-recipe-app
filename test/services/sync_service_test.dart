@@ -112,10 +112,15 @@ class _FakeRemoteGateway implements RecipeRemoteGateway {
   List<RecipeStub> stubs = [];
   final Map<int, Recipe> recipes = {};
   final Map<int, Uint8List> images = {};
+  String cookbookFolderPath = '/Rezepte';
+  int cookbookFolderRequests = 0;
+  bool throwOnCookbookFolder = false;
   Recipe? createdRecipe;
   Recipe? updatedRecipe;
   Recipe? uploadedRecipe;
   Uint8List? uploadedBytes;
+  String? uploadedCookbookFolderPath;
+  final List<String> deletedUserFiles = [];
 
   @override
   Future<void> ensureAccountLinked() async {}
@@ -127,11 +132,31 @@ class _FakeRemoteGateway implements RecipeRemoteGateway {
   }
 
   @override
+  Future<void> deleteUserFile(
+    String path, {
+    required String cookbookFolderPath,
+  }) async {
+    if (!path.startsWith('$cookbookFolderPath/')) {
+      throw StateError('Path outside cookbook folder: $path');
+    }
+    deletedUserFiles.add(path);
+  }
+
+  @override
   Future<void> deleteRecipe(int remoteId) async {}
 
   @override
   Future<Uint8List?> getImage(int remoteId, {String size = 'full'}) async {
     return images[remoteId];
+  }
+
+  @override
+  Future<String> getCookbookFolderPath() async {
+    cookbookFolderRequests++;
+    if (throwOnCookbookFolder) {
+      throw StateError('config unavailable');
+    }
+    return cookbookFolderPath;
   }
 
   @override
@@ -149,10 +174,19 @@ class _FakeRemoteGateway implements RecipeRemoteGateway {
   }
 
   @override
-  Future<String> uploadRecipeImage(Recipe recipe, Uint8List bytes) async {
+  Future<StagedRecipeImage> uploadRecipeImage(
+    Recipe recipe,
+    Uint8List bytes, {
+    required String cookbookFolderPath,
+  }) async {
     uploadedRecipe = recipe;
     uploadedBytes = bytes;
-    return '/.smag-recipe-image-${recipe.localId}.jpg';
+    uploadedCookbookFolderPath = cookbookFolderPath;
+    final stagedPath = '$cookbookFolderPath/.smag-upload-${recipe.localId}.jpg';
+    return StagedRecipeImage(
+      recipeImagePath: stagedPath,
+      stagedFilePath: stagedPath,
+    );
   }
 }
 
@@ -358,7 +392,7 @@ void main() {
             remoteId: 13,
             name: 'Rye Bread',
             recipeCategory: 'Bakery',
-            image: '/.smag-recipe-image-12.jpg',
+            image: 'full.jpg',
             dateModified: 'remote-v2',
           );
 
@@ -374,6 +408,54 @@ void main() {
         expect(gateway.updatedRecipe, isNull);
       },
     );
+
+    test('aborts sync when cookbook folder config cannot be loaded', () async {
+      final db = _FakeRecipeDatabase();
+      final gateway = _FakeRemoteGateway()..throwOnCookbookFolder = true;
+      final imageCache = _FakeRecipeImageCache();
+      final syncService = SyncService(db, gateway, imageCache);
+
+      expect(syncService.sync(), throwsA(isA<StateError>()));
+    });
+
+    test('uses manual cookbook folder override without config call', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'smag_sync_override_test',
+      );
+      addTearDown(() => tempDir.delete(recursive: true));
+      final imageFile = File('${tempDir.path}/manual.jpg');
+      await imageFile.writeAsBytes(const [3, 1, 4]);
+
+      final db = _FakeRecipeDatabase();
+      db.seed(
+        Recipe(
+          localId: 1,
+          name: 'Manual Folder Recipe',
+          image: imageFile.path,
+          localImagePath: imageFile.path,
+        ),
+        SyncStatus.localOnly,
+      );
+
+      final gateway = _FakeRemoteGateway()
+        ..cookbookFolderPath = '/Rezepte'
+        ..recipes[999] = const Recipe(
+          remoteId: 999,
+          name: 'Manual Folder Recipe',
+          image: 'https://cloud.example/recipes/999/image',
+          dateModified: 'remote-v1',
+        );
+
+      final imageCache = _FakeRecipeImageCache();
+      final syncService = SyncService(db, gateway, imageCache);
+
+      await syncService.sync(cookbookFolderOverride: '/Manuell');
+
+      expect(gateway.cookbookFolderRequests, 0);
+      expect(gateway.uploadedCookbookFolderPath, '/Manuell');
+      expect(gateway.createdRecipe?.image, '/Manuell/.smag-upload-1.jpg');
+      expect(gateway.deletedUserFiles, ['/Manuell/.smag-upload-1.jpg']);
+    });
 
     test(
       'uploads local recipe images before creating remote recipes',
@@ -409,7 +491,9 @@ void main() {
 
         expect(gateway.uploadedRecipe?.localId, 1);
         expect(gateway.uploadedBytes, Uint8List.fromList([9, 8, 7, 6]));
-        expect(gateway.createdRecipe?.image, '/.smag-recipe-image-1.jpg');
+        expect(gateway.uploadedCookbookFolderPath, '/Rezepte');
+        expect(gateway.createdRecipe?.image, '/Rezepte/.smag-upload-1.jpg');
+        expect(gateway.deletedUserFiles, ['/Rezepte/.smag-upload-1.jpg']);
 
         final saved = await db.getByRemoteId(999);
         expect(saved?.name, 'Pancakes');

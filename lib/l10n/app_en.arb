@@ -52,6 +52,20 @@
   "syncCanceled": "Sync was canceled before all conflicts were resolved.",
   "syncComplete": "Sync complete: {details}",
   "@syncComplete": { "placeholders": { "details": { "type": "String" } } },
+  "cookbookFolderOverrideTitle": "Cookbook Folder Override",
+  "cookbookFolderOverrideField": "Folder Path",
+  "cookbookFolderOverrideHint": "Optional path (for example /Recipes). Leave empty to use the folder from Nextcloud config.",
+  "cookbookFolderUsesServerConfig": "Using folder from Nextcloud config",
+  "cookbookFolderOverrideActive": "Manual override active: {path}",
+  "@cookbookFolderOverrideActive": {
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "cookbookFolderOverrideWarningTitle": "Manual folder override enabled",
+  "cookbookFolderOverrideWarningBody": "This value normally comes from Nextcloud Cookbook. Use an override only for troubleshooting.",
+  "useServerFolder": "Use Server Folder",
+  "cookbookFolderOverrideInvalid": "Invalid folder path.",
   "connectNextcloud": "Connect Nextcloud",
   "connectNextcloudHint": "Link your Nextcloud Cookbook to sync recipes",
   "disconnectAccount": "Disconnect Account",
