@@ -113,32 +113,33 @@ class _SyncLogScreenState extends State<SyncLogScreen> {
       _entries.clear();
     });
 
-    settings.setSyncing(true);
-    _appendLog('Starting sync.');
-
     try {
-      final result = await syncService.sync(
-        onLog: _appendLog,
-        cookbookFolderOverride: settings.cookbookFolderOverride,
-      );
-      await recipeProvider.loadRecipes();
+      await settings.runWhileSyncing(() async {
+        _appendLog('Starting sync.');
 
-      final canceled = await _resolveConflicts(
-        syncService,
-        db,
-        cookbookFolderOverride: settings.cookbookFolderOverride,
-      );
-      final remainingConflicts = (await db.getConflicts()).length;
-      if (remainingConflicts > 0) {
-        _appendLog('Remaining conflicts: $remainingConflicts.');
-      }
+        final result = await syncService.sync(
+          onLog: _appendLog,
+          cookbookFolderOverride: settings.cookbookFolderOverride,
+        );
+        await recipeProvider.loadRecipes();
 
-      await recipeProvider.loadRecipes();
+        final canceled = await _resolveConflicts(
+          syncService,
+          db,
+          cookbookFolderOverride: settings.cookbookFolderOverride,
+        );
+        final remainingConflicts = (await db.getConflicts()).length;
+        if (remainingConflicts > 0) {
+          _appendLog('Remaining conflicts: $remainingConflicts.');
+        }
 
-      if (!mounted) return;
-      setState(() {
-        _summary = result.toString();
-        _canceled = canceled;
+        await recipeProvider.loadRecipes();
+
+        if (!mounted) return;
+        setState(() {
+          _summary = result.toString();
+          _canceled = canceled;
+        });
       });
     } catch (e) {
       _appendLog('Sync failed: $e');
@@ -147,7 +148,6 @@ class _SyncLogScreenState extends State<SyncLogScreen> {
         _errorText = e.toString();
       });
     } finally {
-      settings.setSyncing(false);
       if (mounted) {
         setState(() {
           _running = false;

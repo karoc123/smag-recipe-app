@@ -33,27 +33,23 @@ Future<void> _pumpDialog(
 
 void main() {
   group('ConflictDialog image differences', () {
-    testWidgets(
-      'hides image difference for local file path vs cookbook image',
-      (tester) async {
-        final local = const Recipe(
-          name: 'Soup',
-          image:
-              '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/1.jpg',
-          localImagePath:
-              '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/1.jpg',
-        );
-        final remote = const Recipe(name: 'Soup', image: 'full.jpg');
+    testWidgets('hides image difference for local file path vs cookbook image', (
+      tester,
+    ) async {
+      final local = const Recipe(
+        name: 'Soup',
+        image:
+            '/data/user/0/de.karoc.smagrecipe/app_flutter/smag_local_images/1.jpg',
+        localImagePath:
+            '/data/user/0/de.karoc.smagrecipe/app_flutter/smag_local_images/1.jpg',
+      );
+      final remote = const Recipe(name: 'Soup', image: 'full.jpg');
 
-        await _pumpDialog(tester, local: local, remote: remote);
+      await _pumpDialog(tester, local: local, remote: remote);
 
-        expect(find.text('image'), findsNothing);
-        expect(
-          find.text('No field-level differences detected.'),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(find.text('image'), findsNothing);
+      expect(find.text('No field-level differences detected.'), findsOneWidget);
+    });
 
     testWidgets('shows image difference for two distinct external URLs', (
       tester,

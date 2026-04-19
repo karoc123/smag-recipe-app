@@ -515,7 +515,7 @@ abstract class AppLocalizations {
   /// No description provided for @philosophy.
   ///
   /// In en, this message translates to:
-  /// **'Philosophy (FOSS ❤)'**
+  /// **'Philosophy'**
   String get philosophy;
 
   /// No description provided for @philosophyTitle.

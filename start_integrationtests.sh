@@ -23,7 +23,7 @@ CONTAINER_NAME="smag-android-emulator"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EMULATOR_PORT=5554
 DEVICE_SERIAL="localhost:$EMULATOR_PORT"
-APP_ID="de.karoc.smag"
+APP_ID="de.karoc.smagrecipe"
 MODE="docker"
 
 wait_for_host_device_ready() {

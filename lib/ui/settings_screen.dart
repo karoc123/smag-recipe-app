@@ -99,8 +99,16 @@ class _SyncSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: FilledButton.icon(
-              onPressed: () => _connect(context),
-              icon: const Icon(Icons.link),
+              onPressed: settings.linkingAccount
+                  ? null
+                  : () => _connect(context),
+              icon: settings.linkingAccount
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.link),
               label: Text(l10n.connectNextcloud),
             ),
           ),
@@ -114,7 +122,7 @@ class _SyncSection extends StatelessWidget {
     final success = await settings.linkAccount();
     if (success && context.mounted) {
       // Trigger initial sync.
-      _openSyncScreen(context);
+      await _openSyncScreen(context);
     }
   }
 

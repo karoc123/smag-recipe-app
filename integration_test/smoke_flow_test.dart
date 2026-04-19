@@ -79,6 +79,8 @@ void main() {
     // Settings screen should show stable About section content.
     expect(find.byIcon(Icons.code), findsOneWidget);
     expect(find.byIcon(Icons.privacy_tip_outlined), findsOneWidget);
+    expect(find.text('Philosophie'), findsOneWidget);
+    expect(find.textContaining('FOSS'), findsNothing);
 
     // Go back.
     await tester.tap(find.byIcon(Icons.arrow_back));

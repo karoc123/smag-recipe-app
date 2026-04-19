@@ -228,7 +228,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get privacyPolicy => 'Datenschutz';
 
   @override
-  String get philosophy => 'Philosophie (FOSS ❤)';
+  String get philosophy => 'Philosophie';
 
   @override
   String get philosophyTitle => 'Warum SMAG?';

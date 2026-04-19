@@ -1,4 +1,4 @@
-package de.karoc.smag
+package de.karoc.smagrecipe
 
 import android.app.Activity
 import android.content.Intent
@@ -32,7 +32,7 @@ class NextcloudSsoPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     ActivityAware, PluginRegistry.ActivityResultListener {
 
     companion object {
-        private const val CHANNEL = "de.karoc.smag/nextcloud_sso"
+        private const val CHANNEL = "de.karoc.smagrecipe/nextcloud_sso"
         private const val TAG = "NextcloudSsoPlugin"
         private const val PICK_ACCOUNT_REQUEST = 38571
     }

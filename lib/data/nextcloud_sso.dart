@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 /// All Nextcloud API calls are routed through the native SSO library so the
 /// user never has to enter credentials directly.
 class NextcloudSso {
-  static const _channel = MethodChannel('de.karoc.smag/nextcloud_sso');
+  static const _channel = MethodChannel('de.karoc.smagrecipe/nextcloud_sso');
 
   /// Open the Nextcloud account picker. Returns account info or null.
   Future<NextcloudAccount?> pickAccount() async {

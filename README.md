@@ -78,7 +78,7 @@ flutter build apk --release --no-tree-shake-icons
 
 ## Platform Notes
 
-- Application ID: `de.karoc.smag`
+- Application ID: `de.karoc.smagrecipe`
 - Version: 2.0.0
 - minSdk: 23
 - Internal storage only (no broad external storage permissions)

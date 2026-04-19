@@ -429,19 +429,20 @@ Future<void> _sendToNextcloud(
   );
 
   try {
-    settings.setSyncing(true);
-    if (sourceUrl != null && sourceUrl.isNotEmpty) {
-      await syncService.importFromUrl(sourceUrl);
-    } else {
-      await syncService.pushRecipe(
-        recipe,
+    await settings.runWhileSyncing(() async {
+      if (sourceUrl != null && sourceUrl.isNotEmpty) {
+        await syncService.importFromUrl(sourceUrl);
+      } else {
+        await syncService.pushRecipe(
+          recipe,
+          cookbookFolderOverride: settings.cookbookFolderOverride,
+        );
+      }
+      await syncService.sync(
         cookbookFolderOverride: settings.cookbookFolderOverride,
       );
-    }
-    await syncService.sync(
-      cookbookFolderOverride: settings.cookbookFolderOverride,
-    );
-    await recipeProvider.loadRecipes();
+      await recipeProvider.loadRecipes();
+    });
 
     if (context.mounted) {
       // Dismiss the loading dialog.
@@ -457,8 +458,6 @@ Future<void> _sendToNextcloud(
       Navigator.of(context).pop();
       showErrorDialog(context, title: l10n.syncErrorTitle, error: e);
     }
-  } finally {
-    settings.setSyncing(false);
   }
 }
 

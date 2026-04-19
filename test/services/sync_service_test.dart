@@ -416,9 +416,9 @@ void main() {
             name: 'Rye Bread',
             recipeCategory: 'Bakery',
             image:
-                '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/123.jpg',
+                '/data/user/0/de.karoc.smagrecipe/app_flutter/smag_local_images/123.jpg',
             localImagePath:
-                '/data/user/0/de.karoc.smag/app_flutter/smag_local_images/123.jpg',
+                '/data/user/0/de.karoc.smagrecipe/app_flutter/smag_local_images/123.jpg',
             dateModified: 'local-change',
           ),
           SyncStatus.pendingUpload,

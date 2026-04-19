@@ -17,7 +17,8 @@ class SettingsProvider extends ChangeNotifier {
   AppTheme _theme = AppTheme.light;
   Locale _locale = const Locale('de');
   NextcloudAccount? _account;
-  bool _syncing = false;
+  int _activeSyncOperations = 0;
+  bool _linkingAccount = false;
   String _cookbookFolderOverride = '';
 
   SettingsProvider(this._sso);
@@ -28,7 +29,8 @@ class SettingsProvider extends ChangeNotifier {
   Locale get locale => _locale;
   NextcloudAccount? get account => _account;
   bool get isLinked => _account != null;
-  bool get syncing => _syncing;
+  bool get syncing => _activeSyncOperations > 0;
+  bool get linkingAccount => _linkingAccount;
   String? get cookbookFolderOverride {
     final trimmed = _cookbookFolderOverride.trim();
     return trimmed.isEmpty ? null : trimmed;
@@ -81,13 +83,25 @@ class SettingsProvider extends ChangeNotifier {
   // ---- Nextcloud account ----
 
   Future<bool> linkAccount() async {
-    final result = await _sso.pickAccount();
-    if (result != null) {
-      _account = result;
-      notifyListeners();
-      return true;
+    if (_linkingAccount) {
+      return false;
     }
-    return false;
+
+    _linkingAccount = true;
+    notifyListeners();
+
+    try {
+      final result = await _sso.pickAccount();
+      if (result != null) {
+        _account = result;
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } finally {
+      _linkingAccount = false;
+      notifyListeners();
+    }
   }
 
   Future<void> unlinkAccount() async {
@@ -97,8 +111,31 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   void setSyncing(bool v) {
-    _syncing = v;
-    notifyListeners();
+    if (v) {
+      _activeSyncOperations++;
+      if (_activeSyncOperations == 1) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (_activeSyncOperations == 0) {
+      return;
+    }
+
+    _activeSyncOperations--;
+    if (_activeSyncOperations == 0) {
+      notifyListeners();
+    }
+  }
+
+  Future<T> runWhileSyncing<T>(Future<T> Function() action) async {
+    setSyncing(true);
+    try {
+      return await action();
+    } finally {
+      setSyncing(false);
+    }
   }
 
   Future<void> setCookbookFolderOverride(String value) async {

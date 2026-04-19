@@ -1,4 +1,4 @@
-package de.karoc.smag
+package de.karoc.smagrecipe
 
 import android.content.Intent
 import android.util.Patterns
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val INTENT_CHANNEL = "de.karoc.smag/intent"
+    private val INTENT_CHANNEL = "de.karoc.smagrecipe/intent"
     private var pendingUrl: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

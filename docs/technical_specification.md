@@ -62,7 +62,7 @@ Recipes follow the Nextcloud Cookbook JSON format:
 ### 4. Authentication
 
 - **Nextcloud Android SSO** library v1.3.4 via platform channel (Kotlin ↔ Dart).
-- Channel name: `de.karoc.smag/nextcloud_sso`
+- Channel name: `de.karoc.smagrecipe/nextcloud_sso`
 - Methods: `pickAccount`, `getCurrentAccount`, `resetAccount`, `performRequest`, `performBinaryRequest`, `performBinaryUpload`.
 - Requires the Nextcloud Android client to be installed on the device.
 

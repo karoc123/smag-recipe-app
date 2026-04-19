@@ -21,7 +21,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
-  static const intentChannel = MethodChannel('de.karoc.smag/intent');
+  static const intentChannel = MethodChannel('de.karoc.smagrecipe/intent');
   bool _showGrid = false;
 
   @override
