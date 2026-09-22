@@ -135,8 +135,9 @@ class SmagApp extends StatelessWidget {
   // ──────────────── Typography ───────────────────
 
   TextTheme _textTheme(Brightness brightness) {
-    final color =
-        brightness == Brightness.light ? Colors.black87 : Colors.white;
+    final color = brightness == Brightness.light
+        ? Colors.black87
+        : Colors.white;
 
     return TextTheme(
       displayLarge: GoogleFonts.playfairDisplay(color: color),

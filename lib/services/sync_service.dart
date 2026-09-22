@@ -201,6 +201,9 @@ class SyncService {
     );
   }
 
+  /// Returns all local recipes currently flagged with conflict status.
+  Future<List<Recipe>> getConflicts() => _db.getConflicts();
+
   /// Resolve a conflict by keeping either the local or remote version.
   Future<void> resolveConflict(
     int localId, {
@@ -257,7 +260,7 @@ class SyncService {
       cookbookFolderPath: cookbookFolderPath,
     );
     try {
-      return _remoteGateway.createRecipe(uploadReady.recipe);
+      return await _remoteGateway.createRecipe(uploadReady.recipe);
     } finally {
       await _cleanupStagedUpload(
         uploadReady.stagedFilePath,

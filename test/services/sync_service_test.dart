@@ -99,6 +99,13 @@ class _FakeRecipeDatabase extends RecipeDatabase {
   }
 
   @override
+  Future<List<Recipe>> getConflicts() async {
+    return _byLocalId.values
+        .where((recipe) => _statuses[recipe.localId] == SyncStatus.conflict)
+        .toList();
+  }
+
+  @override
   Future<bool> hasRemoteVersionChanged(
     int localId,
     String remoteDateModified,
@@ -549,5 +556,22 @@ void main() {
         expect(result.pushed, 1);
       },
     );
+
+    test('getConflicts returns recipes flagged as conflict', () async {
+      final db = _FakeRecipeDatabase();
+      final syncService = SyncService(
+        db,
+        _FakeRemoteGateway(),
+        _FakeRecipeImageCache(),
+      );
+
+      const recipe1 = Recipe(localId: 1, name: 'Conflict Recipe');
+      const recipe2 = Recipe(localId: 2, name: 'Synced Recipe');
+      db.seed(recipe1, SyncStatus.conflict);
+      db.seed(recipe2, SyncStatus.synced);
+
+      final conflicts = await syncService.getConflicts();
+      expect(conflicts.map((r) => r.localId), [1]);
+    });
   });
 }
