@@ -2,11 +2,7 @@
 
 SMAG is quiet software for recipes: local-first, offline-first, distraction-free, and built to last.
 
-No feeds. No tracking. No noise between you and your food.
-
-## Why SMAG
-
-Most recipe apps fight for attention. SMAG protects it.
+## Why i wanted to have SMAG
 
 - **Privacy by design:** recipes stay local by default
 - **Nextcloud Cookbook integration:** optional sync via the Nextcloud Android SSO library
